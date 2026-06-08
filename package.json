@@ -1,0 +1,25 @@
+{
+  "name": "illustrator-agent-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "illustrator-agent-bridge": "./dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "npm run build && npm test",
+    "test": "node --test dist/tests/*.test.js",
+    "start": "node dist/src/cli.js serve",
+    "mcp:list-tools": "node dist/src/cli.js mcp:list-tools",
+    "jsx:ping": "node dist/src/cli.js jsx:ping",
+    "jsx:cartoon": "node dist/src/cli.js jsx:cartoon examples/cartoon-scene.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.4.5"
+  }
+}

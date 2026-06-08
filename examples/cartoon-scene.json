@@ -1,0 +1,133 @@
+{
+  "document": {
+    "title": "Cartoon Lab Scene",
+    "width": 720,
+    "height": 480,
+    "colorMode": "RGB"
+  },
+  "elements": [
+    {
+      "type": "rect",
+      "name": "warm off-white background",
+      "x": 0,
+      "y": 0,
+      "width": 720,
+      "height": 480,
+      "style": { "fill": "#F7F2E8", "stroke": null }
+    },
+    {
+      "type": "ellipse",
+      "name": "soft blue window",
+      "x": 450,
+      "y": 55,
+      "width": 190,
+      "height": 130,
+      "style": { "fill": "#B7D9E8", "stroke": "#1E4251", "strokeWidth": 3 }
+    },
+    {
+      "type": "rect",
+      "name": "bench top",
+      "x": 80,
+      "y": 330,
+      "width": 560,
+      "height": 42,
+      "style": { "fill": "#5E7485", "stroke": "#243845", "strokeWidth": 3 }
+    },
+    {
+      "type": "ellipse",
+      "name": "scientist head",
+      "x": 190,
+      "y": 112,
+      "width": 118,
+      "height": 118,
+      "style": { "fill": "#F2C2A0", "stroke": "#1D1B1B", "strokeWidth": 4 }
+    },
+    {
+      "type": "ellipse",
+      "name": "left lens",
+      "x": 216,
+      "y": 154,
+      "width": 28,
+      "height": 24,
+      "style": { "fill": "#FFFFFF", "stroke": "#1D1B1B", "strokeWidth": 3 }
+    },
+    {
+      "type": "ellipse",
+      "name": "right lens",
+      "x": 258,
+      "y": 154,
+      "width": 28,
+      "height": 24,
+      "style": { "fill": "#FFFFFF", "stroke": "#1D1B1B", "strokeWidth": 3 }
+    },
+    {
+      "type": "line",
+      "name": "glasses bridge",
+      "x": 244,
+      "y": 166,
+      "x2": 258,
+      "y2": 166,
+      "style": { "stroke": "#1D1B1B", "strokeWidth": 3 }
+    },
+    {
+      "type": "polygon",
+      "name": "lab coat",
+      "x": 0,
+      "y": 0,
+      "points": [
+        { "x": 150, "y": 290 },
+        { "x": 210, "y": 225 },
+        { "x": 295, "y": 225 },
+        { "x": 355, "y": 290 },
+        { "x": 330, "y": 350 },
+        { "x": 170, "y": 350 }
+      ],
+      "style": { "fill": "#FFFFFF", "stroke": "#1D1B1B", "strokeWidth": 4 }
+    },
+    {
+      "type": "ellipse",
+      "name": "round flask",
+      "x": 420,
+      "y": 238,
+      "width": 95,
+      "height": 95,
+      "style": { "fill": "#8DD6C8", "stroke": "#1D1B1B", "strokeWidth": 4, "opacity": 78 }
+    },
+    {
+      "type": "rect",
+      "name": "flask neck",
+      "x": 455,
+      "y": 192,
+      "width": 25,
+      "height": 62,
+      "style": { "fill": "#8DD6C8", "stroke": "#1D1B1B", "strokeWidth": 4, "opacity": 78 }
+    },
+    {
+      "type": "ellipse",
+      "name": "small reaction bubble",
+      "x": 505,
+      "y": 155,
+      "width": 28,
+      "height": 28,
+      "style": { "fill": "#F5D04C", "stroke": "#1D1B1B", "strokeWidth": 3 }
+    },
+    {
+      "type": "ellipse",
+      "name": "large reaction bubble",
+      "x": 540,
+      "y": 112,
+      "width": 42,
+      "height": 42,
+      "style": { "fill": "#FF8A65", "stroke": "#1D1B1B", "strokeWidth": 3 }
+    },
+    {
+      "type": "text",
+      "name": "caption",
+      "x": 108,
+      "y": 410,
+      "text": "Agent-generated vector cartoon",
+      "size": 22,
+      "style": { "fill": "#243845" }
+    }
+  ]
+}
