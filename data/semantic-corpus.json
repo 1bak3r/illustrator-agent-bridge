@@ -1,0 +1,50 @@
+[
+  {
+    "id": "object.lab-scientist.cartoon",
+    "kind": "object_semantics",
+    "title": "Cartoon lab scientist",
+    "tags": ["scientist", "lab", "goggles", "coat", "character"],
+    "text": "A readable cartoon lab scientist usually needs a large simple head, clear goggles or glasses, a white coat shape, and one or two lab props. Use bold outlines, simple filled shapes, and a friendly facial expression. Keep the silhouette readable before adding small details.",
+    "source": "local seed visual semantics"
+  },
+  {
+    "id": "object.round-flask.cartoon",
+    "kind": "object_semantics",
+    "title": "Round laboratory flask",
+    "tags": ["flask", "glassware", "reaction", "liquid", "bubble"],
+    "text": "A round flask reads well as a circular or pear-shaped body with a narrow neck, translucent blue-green fill, a dark outline, and a few bubbles. Liquid should occupy the lower half so the container remains legible.",
+    "source": "local seed visual semantics"
+  },
+  {
+    "id": "style.publication-cartoon-vector",
+    "kind": "style_reference",
+    "title": "Publication cartoon vector style",
+    "tags": ["cartoon", "publication", "vector", "outline", "palette"],
+    "text": "For publication-quality cartoon vector figures, prefer a limited palette, consistent stroke widths, clean named layers, and large simple forms. Avoid tiny decorative details that disappear when printed. Use labels only where they add scientific meaning.",
+    "source": "local seed style guide"
+  },
+  {
+    "id": "requirement.figure-readability",
+    "kind": "publication_requirement",
+    "title": "Scientific figure readability",
+    "tags": ["publication", "readability", "contrast", "label", "export"],
+    "text": "A publication figure should remain readable at final column size. Use high contrast between text and background, keep text large enough after scaling, and export vector formats such as PDF or SVG when possible. Check that important objects are not hidden by labels.",
+    "source": "local seed publication requirements"
+  },
+  {
+    "id": "capability.illustrator-extendscript-vector",
+    "kind": "illustrator_capability",
+    "title": "Illustrator ExtendScript vector drawing",
+    "tags": ["illustrator", "extendscript", "path", "text", "layer"],
+    "text": "Illustrator ExtendScript can create documents, layers, path items, ellipses, rectangles, polygons, lines, text frames, fills, strokes, opacity, names, and exports. Keep generated scripts simple and compatible with the older ExtendScript runtime.",
+    "source": "local bridge capability model"
+  },
+  {
+    "id": "workflow.semantic-first",
+    "kind": "style_reference",
+    "title": "Semantic-first image planning",
+    "tags": ["semantic", "planning", "retrieval", "agent"],
+    "text": "Before drawing, retrieve object semantics and publication constraints, then turn those into a structured scene plan. The drawing command should be concrete and validated; retrieved text should inform the plan rather than being executed directly.",
+    "source": "local bridge workflow"
+  }
+]

@@ -14,6 +14,7 @@ npm install
 npm run build
 npm run jsx:ping
 npm run jsx:cartoon
+npm run semantic:search -- "cartoon lab flask"
 ```
 
 The `jsx:*` commands write jobs under `var/jobs/` and expected results under `var/results/`. In Illustrator, run a generated job with `File > Scripts > Other Script`, then inspect the matching result JSON.
@@ -31,6 +32,15 @@ Start the local HTTP job bridge for an LLM/browser agent:
 ```bash
 npm start
 ```
+
+Expose the bridge itself as an MCP server over stdio:
+
+```bash
+npm run mcp:serve
+```
+
+That server exposes tools to create Illustrator JSX jobs and to proxy Illustrator Beta MCP calls when `ILLUSTRATOR_MCP_URL` and `ILLUSTRATOR_MCP_TOKEN` are configured.
+It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
 
 Create a job over HTTP:
 

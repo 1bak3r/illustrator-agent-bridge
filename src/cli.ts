@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { startAgentMcpStdioServer } from "./agent/mcpServer.js";
 import { createGeneratedJob } from "./bridge/jobs.js";
 import { generatedJobSummary } from "./bridge/jsxGenerator.js";
 import { startBridgeServer } from "./bridge/server.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, McpConfigError } from "./mcp/illustratorClient.js";
+import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -16,6 +18,9 @@ async function main(argv: string[]): Promise<void> {
     case "mcp:call":
       await callTool(rest);
       return;
+    case "mcp:serve":
+      await startAgentMcpStdioServer();
+      return;
     case "jsx:ping":
       await makePing(rest);
       return;
@@ -24,6 +29,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "serve":
       await serve(rest);
+      return;
+    case "semantic:search":
+      await semanticSearch(rest);
       return;
     case "help":
     case "--help":
@@ -97,6 +105,21 @@ async function serve(args: string[]): Promise<void> {
   await server.close();
 }
 
+async function semanticSearch(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const query = options.positionals.join(" ");
+
+  if (!query) {
+    throw new ValidationError("semantic:search requires a query");
+  }
+
+  const limit = optionValue(options, "limit") ? Number(optionValue(options, "limit")) : undefined;
+  const corpus = await loadDefaultCorpus(optionValue(options, "corpus"));
+  const results = searchCorpus(query, corpus, { limit });
+
+  console.log(JSON.stringify({ ok: true, query, resultCount: results.length, results }, null, 2));
+}
+
 interface ParsedOptions {
   positionals: string[];
   values: Map<string, string>;
@@ -162,14 +185,17 @@ function printHelp(): void {
 Commands:
   mcp:list-tools [--url URL] [--token TOKEN]
   mcp:call TOOL [JSON_OR_PATH] [--url URL] [--token TOKEN]
+  mcp:serve
   jsx:ping [--message TEXT] [--root DIR]
   jsx:cartoon [SCENE_JSON_PATH] [--root DIR]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
+  semantic:search QUERY [--limit N] [--corpus PATH]
 
 Environment:
   ILLUSTRATOR_MCP_URL       Illustrator Beta MCP URL, for example http://localhost:18412/v1/mcp
   ILLUSTRATOR_MCP_TOKEN     Bearer key copied from Illustrator Beta MCP & Tools
   ILLUSTRATOR_AGENT_BRIDGE_ROOT  Generated job/result root, default ./var
+  ILLUSTRATOR_SEMANTIC_CORPUS    Semantic corpus JSON path, default ./data/semantic-corpus.json
 `);
 }
 

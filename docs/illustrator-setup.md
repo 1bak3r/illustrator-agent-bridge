@@ -65,3 +65,18 @@ curl -sS http://127.0.0.1:4317/v1/jobs \
   -H 'content-type: application/json' \
   --data-binary @<(node -e 'const fs=require("fs"); const scene=JSON.parse(fs.readFileSync("examples/cartoon-scene.json","utf8")); console.log(JSON.stringify({kind:"cartoon_scene", scene}))')
 ```
+
+## Agent-Facing MCP Server
+
+Run the bridge as a stdio MCP server:
+
+```bash
+npm run mcp:serve
+```
+
+An MCP client can then call:
+
+- `bridge_create_ping_job`
+- `bridge_create_cartoon_scene_job`
+- `illustrator_beta_list_tools`
+- `illustrator_beta_call_tool`

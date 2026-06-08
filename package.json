@@ -11,12 +11,15 @@
     "check": "npm run build && npm test",
     "test": "node --test dist/tests/*.test.js",
     "start": "node dist/src/cli.js serve",
+    "mcp:serve": "node dist/src/cli.js mcp:serve",
     "mcp:list-tools": "node dist/src/cli.js mcp:list-tools",
     "jsx:ping": "node dist/src/cli.js jsx:ping",
-    "jsx:cartoon": "node dist/src/cli.js jsx:cartoon examples/cartoon-scene.json"
+    "jsx:cartoon": "node dist/src/cli.js jsx:cartoon examples/cartoon-scene.json",
+    "semantic:search": "node dist/src/cli.js semantic:search"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

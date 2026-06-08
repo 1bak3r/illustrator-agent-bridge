@@ -2,6 +2,8 @@
 
 The semantic search layer should answer visual and factual grounding questions before Illustrator commands are generated.
 
+The repo currently includes a deterministic local search baseline in `data/semantic-corpus.json` and `src/semantic/search.ts`. It uses tokenization, light query expansion, and BM25-style ranking. This is the retrieval contract for the first agent loop; embeddings can replace or augment the ranker later without changing the planner contract.
+
 ## Retrieval Targets
 
 - Object semantics: what parts and proportions define a requested object.
