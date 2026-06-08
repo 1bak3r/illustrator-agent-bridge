@@ -16,6 +16,7 @@ npm run jsx:ping
 npm run jsx:cartoon
 npm run semantic:search -- "cartoon lab flask"
 npm run plan:cartoon -- "cartoon lab scientist with flask"
+npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
 ```
 
 The `jsx:*` commands write jobs under `var/jobs/` and expected results under `var/results/`. In Illustrator, run a generated job with `File > Scripts > Other Script`, then inspect the matching result JSON.
@@ -24,6 +25,13 @@ After a document exists in Illustrator, generate an export job:
 
 ```bash
 npm run jsx:export -- --format pdf --output ./var/exports/figure.pdf
+```
+
+Check or wait for a job result after the JSX has been run in Illustrator:
+
+```bash
+node dist/src/cli.js job:status <job-id>
+node dist/src/cli.js job:wait <job-id> --timeout-ms 60000
 ```
 
 For the native MCP path, copy the server URL and key from Illustrator Beta `MCP & Tools`, then:
@@ -49,6 +57,7 @@ npm run mcp:serve
 That server exposes tools to create Illustrator JSX jobs and to proxy Illustrator Beta MCP calls when `ILLUSTRATOR_MCP_URL` and `ILLUSTRATOR_MCP_TOKEN` are configured.
 It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
 Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
+Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
 
 Create a job over HTTP:
 

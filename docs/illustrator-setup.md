@@ -78,6 +78,28 @@ Plan from a prompt, retrieve semantic evidence, run static QA, and create the sc
 npm run plan:cartoon -- "cartoon lab scientist with flask"
 ```
 
+Prepare a complete prompt-to-export fallback runbook:
+
+```bash
+npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
+```
+
+The workflow returns two generated JSX jobs:
+
+1. Run the scene job in Illustrator.
+2. Wait for its result:
+
+```bash
+node dist/src/cli.js job:wait <scene-job-id> --timeout-ms 60000
+```
+
+3. Run the export job in Illustrator.
+4. Wait for its result:
+
+```bash
+node dist/src/cli.js job:wait <export-job-id> --timeout-ms 60000
+```
+
 ## Agent-Facing MCP Server
 
 Run the bridge as a stdio MCP server:
@@ -92,5 +114,8 @@ An MCP client can then call:
 - `bridge_create_cartoon_scene_job`
 - `bridge_create_export_job`
 - `plan_cartoon_scene_job`
+- `prepare_cartoon_publication_workflow`
+- `bridge_get_job_status`
+- `bridge_wait_for_job_result`
 - `illustrator_beta_list_tools`
 - `illustrator_beta_call_tool`

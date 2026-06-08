@@ -18,10 +18,13 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
   try {
     const listed = await client.listTools();
     assert.ok(listed.tools.some((tool) => tool.name === "semantic_search_visual_knowledge"));
+    assert.ok(listed.tools.some((tool) => tool.name === "prepare_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "plan_cartoon_scene_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_ping_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_cartoon_scene_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_export_job"));
+    assert.ok(listed.tools.some((tool) => tool.name === "bridge_get_job_status"));
+    assert.ok(listed.tools.some((tool) => tool.name === "bridge_wait_for_job_result"));
 
     const searchResult = await client.callTool({
       name: "semantic_search_visual_knowledge",
@@ -62,6 +65,19 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.equal(planBody.ok, true);
     assert.equal(planBody.plan.qa.ok, true);
     assert.match(planBody.job.jobPath, /jobs\/.+\.jsx$/);
+
+    const workflowResult = await client.callTool({
+      name: "prepare_cartoon_publication_workflow",
+      arguments: {
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/mcp-workflow.pdf",
+        root
+      }
+    });
+    const workflowContent = workflowResult.content as Array<{ type: string; text?: string }>;
+    const workflowBody = JSON.parse(workflowContent[0]?.text ?? "");
+    assert.equal(workflowBody.ok, true);
+    assert.equal(workflowBody.runbook.length, 4);
   } finally {
     await client.close();
     await server.close();

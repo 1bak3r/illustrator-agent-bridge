@@ -17,6 +17,7 @@
     "jsx:cartoon": "node dist/src/cli.js jsx:cartoon examples/cartoon-scene.json",
     "jsx:export": "node dist/src/cli.js jsx:export",
     "plan:cartoon": "node dist/src/cli.js plan:cartoon",
+    "workflow:cartoon": "node dist/src/cli.js workflow:cartoon",
     "semantic:search": "node dist/src/cli.js semantic:search"
   },
   "dependencies": {

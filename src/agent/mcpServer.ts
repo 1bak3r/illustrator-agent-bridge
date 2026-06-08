@@ -3,10 +3,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod/v4";
 import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
+import { readJobStatus, waitForJobResult } from "../bridge/results.js";
 import { normalizeScene } from "../bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } from "../mcp/illustratorClient.js";
 import { planCartoonScene } from "../planner/cartoonPlanner.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
+import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
 
 const optionalRootSchema = z.string().min(1).optional();
 const optionalUrlSchema = z.string().url().optional();
@@ -54,6 +56,36 @@ export function createAgentMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "prepare_cartoon_publication_workflow",
+    {
+      title: "Prepare Cartoon Publication Workflow",
+      description:
+        "Prepare a complete fallback workflow: semantic plan, scene JSX job, export JSX job, and runbook for executing those jobs in Illustrator.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000),
+        outputPath: z.string().min(1).max(1000),
+        format: exportFormatSchema.optional(),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ prompt, outputPath, format, width, height, title, root }) => {
+      const workflow = await prepareCartoonWorkflow({
+        prompt,
+        outputPath,
+        format,
+        width,
+        height,
+        title,
+        root
+      });
+      return jsonToolResult(workflow);
+    }
+  );
+
+  server.registerTool(
     "plan_cartoon_scene_job",
     {
       title: "Plan Cartoon Scene and Create JSX Job",
@@ -76,6 +108,47 @@ export function createAgentMcpServer(): McpServer {
         plan,
         job: generatedJobSummary(job),
         run: runInstructions(job)
+      });
+    }
+  );
+
+  server.registerTool(
+    "bridge_get_job_status",
+    {
+      title: "Get Illustrator Job Status",
+      description: "Check whether a generated Illustrator JSX job has written its result JSON.",
+      inputSchema: {
+        jobId: z.string().min(1),
+        root: optionalRootSchema
+      }
+    },
+    async ({ jobId, root }) => {
+      const status = await readJobStatus(jobId, root);
+      return jsonToolResult({
+        ok: true,
+        job: status
+      });
+    }
+  );
+
+  server.registerTool(
+    "bridge_wait_for_job_result",
+    {
+      title: "Wait for Illustrator Job Result",
+      description:
+        "Poll for a generated Illustrator JSX job result JSON. Use after an agent or human has run the JSX in Illustrator.",
+      inputSchema: {
+        jobId: z.string().min(1),
+        timeoutMs: z.number().int().min(0).max(600_000).optional(),
+        intervalMs: z.number().int().min(100).max(60_000).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ jobId, timeoutMs, intervalMs, root }) => {
+      const status = await waitForJobResult(jobId, { timeoutMs, intervalMs, root });
+      return jsonToolResult({
+        ok: true,
+        job: status
       });
     }
   );
@@ -208,12 +281,15 @@ export function createAgentMcpServer(): McpServer {
               preferredPath: "Illustrator Beta MCP when configured; generated JSX fallback otherwise.",
               tools: [
                 "semantic_search_visual_knowledge",
+                "prepare_cartoon_publication_workflow",
                 "plan_cartoon_scene_job",
                 "illustrator_beta_list_tools",
                 "illustrator_beta_call_tool",
                 "bridge_create_ping_job",
                 "bridge_create_cartoon_scene_job",
-                "bridge_create_export_job"
+                "bridge_create_export_job",
+                "bridge_get_job_status",
+                "bridge_wait_for_job_result"
               ],
               generatedJobContract: {
                 runInIllustrator: "File > Scripts > Other Script",

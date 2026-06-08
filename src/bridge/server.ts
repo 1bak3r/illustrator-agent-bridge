@@ -1,10 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
 import { createGeneratedJob } from "./jobs.js";
 import { resolveBridgeRoot } from "./files.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
+import { JobResultError, readJobStatus } from "./results.js";
 import { normalizeCommand, ValidationError } from "./validation.js";
+import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
 
 export interface ServerOptions {
   host?: string;
@@ -74,17 +74,46 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
     return;
   }
 
+  if (method === "POST" && url.pathname === "/v1/workflows/cartoon") {
+    const body = objectBody(await readJson(request));
+    const prompt = stringBodyValue(body.prompt, "prompt");
+    const outputPath = stringBodyValue(body.outputPath, "outputPath");
+    const workflow = await prepareCartoonWorkflow({
+      prompt,
+      outputPath,
+      format: optionalExportFormat(body.format),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      root
+    });
+    writeJson(response, 201, workflow);
+    return;
+  }
+
+  if (method === "GET" && url.pathname.startsWith("/v1/jobs/") && url.pathname.endsWith("/status")) {
+    const id = url.pathname.split("/")[3];
+    const status = await readJobStatus(id, root);
+    writeJson(response, 200, {
+      ok: true,
+      job: status
+    });
+    return;
+  }
+
   if (method === "GET" && url.pathname.startsWith("/v1/jobs/") && url.pathname.endsWith("/result")) {
-    const parts = url.pathname.split("/");
-    const id = parts[3];
-    if (basename(id) !== id || !/^[0-9a-f-]{36}$/.test(id)) {
-      throw new ValidationError("Invalid job id");
+    const id = url.pathname.split("/")[3];
+    const status = await readJobStatus(id, root);
+    if (!status.exists) {
+      writeJson(response, 404, {
+        ok: false,
+        error: "Job result not found",
+        job: status
+      });
+      return;
     }
 
-    const resultPath = `${root}/results/${id}.json`;
-    const result = await readFile(resultPath, "utf8");
-    response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-    response.end(result);
+    writeJson(response, 200, status.result);
     return;
   }
 
@@ -119,7 +148,7 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
 }
 
 function statusForError(error: unknown): number {
-  if (error instanceof ValidationError) {
+  if (error instanceof ValidationError || error instanceof JobResultError) {
     return 400;
   }
 
@@ -129,4 +158,53 @@ function statusForError(error: unknown): number {
 function writeJson(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(`${JSON.stringify(body, null, 2)}\n`);
+}
+
+function objectBody(input: unknown): Record<string, unknown> {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new ValidationError("Request body must be a JSON object");
+  }
+
+  return input as Record<string, unknown>;
+}
+
+function stringBodyValue(input: unknown, name: string): string {
+  if (typeof input !== "string" || input.length === 0) {
+    throw new ValidationError(`${name} must be a non-empty string`);
+  }
+
+  return input;
+}
+
+function optionalStringBodyValue(input: unknown, name: string): string | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  return stringBodyValue(input, name);
+}
+
+function optionalNumberBodyValue(input: unknown, name: string): number | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  if (typeof input !== "number" || !Number.isFinite(input)) {
+    throw new ValidationError(`${name} must be a finite number`);
+  }
+
+  return input;
+}
+
+function optionalExportFormat(input: unknown): "pdf" | "svg" | "png" | "jpg" | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "format").toLowerCase();
+  if (value !== "pdf" && value !== "svg" && value !== "png" && value !== "jpg") {
+    throw new ValidationError("format must be pdf, svg, png, or jpg");
+  }
+
+  return value;
 }

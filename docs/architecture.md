@@ -43,7 +43,7 @@ LLM MCP client -> illustrator-agent-bridge stdio MCP -> generated JSX or Illustr
 Planned cartoon fallback:
 
 ```text
-Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> export JSX -> visual inspection
+Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> wait result -> export JSX -> wait result -> visual inspection
 ```
 
 ## Near-Term Milestones
@@ -52,3 +52,4 @@ Prompt -> semantic search -> deterministic scene planner -> static QA -> generat
 2. Add a small vocabulary of high-level vector commands: create document, create named layer, draw styled shapes, edit text, export PDF/SVG/PNG.
 3. Add semantic retrieval for "what is this object/style?" before generating scene plans.
 4. Add visual QA: export a PNG, inspect dimensions/nonblank pixels, and iterate before declaring artwork done.
+5. Replace the deterministic planner with an LLM planner that still emits the same validated scene contract.

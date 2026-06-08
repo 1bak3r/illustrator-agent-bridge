@@ -6,6 +6,8 @@ The repo currently includes a deterministic local search baseline in `data/seman
 
 The first planner is `plan:cartoon` / `plan_cartoon_scene_job`. It retrieves evidence, builds a conservative vector scene, runs static QA checks for figure size, text size, named elements, stroke consistency, and element count, then generates an Illustrator JSX job.
 
+The first orchestrated fallback is `workflow:cartoon` / `prepare_cartoon_publication_workflow`. It prepares the scene job, prepares the export job, and returns a runbook that an agent browser can follow while polling result JSON files with `job:wait` or `bridge_wait_for_job_result`.
+
 ## Retrieval Targets
 
 - Object semantics: what parts and proportions define a requested object.

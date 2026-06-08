@@ -3,11 +3,13 @@ import { readFile } from "node:fs/promises";
 import { startAgentMcpStdioServer } from "./agent/mcpServer.js";
 import { createGeneratedJob } from "./bridge/jobs.js";
 import { generatedJobSummary } from "./bridge/jsxGenerator.js";
+import { JobResultError, readJobStatus, waitForJobResult } from "./bridge/results.js";
 import { startBridgeServer } from "./bridge/server.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, McpConfigError } from "./mcp/illustratorClient.js";
 import { planCartoonScene } from "./planner/cartoonPlanner.js";
 import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
+import { prepareCartoonWorkflow } from "./workflow/cartoonWorkflow.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -33,6 +35,15 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "plan:cartoon":
       await planCartoon(rest);
+      return;
+    case "workflow:cartoon":
+      await workflowCartoon(rest);
+      return;
+    case "job:status":
+      await jobStatus(rest);
+      return;
+    case "job:wait":
+      await jobWait(rest);
       return;
     case "serve":
       await serve(rest);
@@ -146,6 +157,34 @@ async function semanticSearch(args: string[]): Promise<void> {
   console.log(JSON.stringify({ ok: true, query, resultCount: results.length, results }, null, 2));
 }
 
+async function jobStatus(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const id = options.positionals[0];
+
+  if (!id) {
+    throw new ValidationError("job:status requires a job id");
+  }
+
+  const status = await readJobStatus(id, optionValue(options, "root"));
+  console.log(JSON.stringify({ ok: true, job: status }, null, 2));
+}
+
+async function jobWait(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const id = options.positionals[0];
+
+  if (!id) {
+    throw new ValidationError("job:wait requires a job id");
+  }
+
+  const status = await waitForJobResult(id, {
+    root: optionValue(options, "root"),
+    timeoutMs: optionValue(options, "timeout-ms") ? Number(optionValue(options, "timeout-ms")) : undefined,
+    intervalMs: optionValue(options, "interval-ms") ? Number(optionValue(options, "interval-ms")) : undefined
+  });
+  console.log(JSON.stringify({ ok: true, job: status }, null, 2));
+}
+
 async function planCartoon(args: string[]): Promise<void> {
   const options = parseOptions(args);
   const prompt = options.positionals.join(" ");
@@ -173,6 +212,33 @@ async function planCartoon(args: string[]): Promise<void> {
       2
     )
   );
+}
+
+async function workflowCartoon(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const prompt = options.positionals.join(" ");
+  const outputPath = optionValue(options, "output");
+
+  if (!prompt) {
+    throw new ValidationError("workflow:cartoon requires a prompt");
+  }
+
+  if (!outputPath) {
+    throw new ValidationError("workflow:cartoon requires --output PATH");
+  }
+
+  const workflow = await prepareCartoonWorkflow({
+    prompt,
+    outputPath,
+    format: optionalExportFormat(optionValue(options, "format")),
+    root: optionValue(options, "root"),
+    corpusPath: optionValue(options, "corpus"),
+    title: optionValue(options, "title"),
+    width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined
+  });
+
+  console.log(JSON.stringify(workflow, null, 2));
 }
 
 interface ParsedOptions {
@@ -245,6 +311,9 @@ Commands:
   jsx:cartoon [SCENE_JSON_PATH] [--root DIR]
   jsx:export --output PATH [--format pdf|svg|png|jpg] [--root DIR]
   plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--root DIR] [--corpus PATH]
+  workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--root DIR] [--corpus PATH]
+  job:status JOB_ID [--root DIR]
+  job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
   semantic:search QUERY [--limit N] [--corpus PATH]
 
@@ -257,7 +326,20 @@ Environment:
 }
 
 main(process.argv.slice(2)).catch((error) => {
-  const expected = error instanceof ValidationError || error instanceof McpConfigError;
+  const expected = error instanceof ValidationError || error instanceof McpConfigError || error instanceof JobResultError;
   console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
   process.exitCode = expected ? 2 : 1;
 });
+
+function optionalExportFormat(input: string | undefined): "pdf" | "svg" | "png" | "jpg" | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = input.toLowerCase();
+  if (value !== "pdf" && value !== "svg" && value !== "png" && value !== "jpg") {
+    throw new ValidationError("format must be pdf, svg, png, or jpg");
+  }
+
+  return value;
+}
