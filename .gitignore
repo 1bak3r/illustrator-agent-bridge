@@ -4,6 +4,7 @@ dist/
 .DS_Store
 var/jobs/*
 var/results/*
+var/exports/*
 !var/.gitkeep
 !var/jobs/.gitkeep
 !var/results/.gitkeep

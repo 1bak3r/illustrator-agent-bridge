@@ -6,6 +6,7 @@ import { generatedJobSummary } from "./bridge/jsxGenerator.js";
 import { startBridgeServer } from "./bridge/server.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, McpConfigError } from "./mcp/illustratorClient.js";
+import { planCartoonScene } from "./planner/cartoonPlanner.js";
 import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
 
 async function main(argv: string[]): Promise<void> {
@@ -26,6 +27,12 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "jsx:cartoon":
       await makeCartoon(rest);
+      return;
+    case "jsx:export":
+      await makeExport(rest);
+      return;
+    case "plan:cartoon":
+      await planCartoon(rest);
       return;
     case "serve":
       await serve(rest);
@@ -90,6 +97,25 @@ async function makeCartoon(args: string[]): Promise<void> {
   console.log(JSON.stringify({ ok: true, job: generatedJobSummary(job) }, null, 2));
 }
 
+async function makeExport(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const format = optionValue(options, "format") ?? "pdf";
+  const outputPath = optionValue(options, "output");
+
+  if (!outputPath) {
+    throw new ValidationError("jsx:export requires --output PATH");
+  }
+
+  const command = normalizeCommand({
+    kind: "export",
+    format,
+    outputPath
+  });
+  const job = await createGeneratedJob(command, optionValue(options, "root"));
+
+  console.log(JSON.stringify({ ok: true, job: generatedJobSummary(job) }, null, 2));
+}
+
 async function serve(args: string[]): Promise<void> {
   const options = parseOptions(args);
   const port = optionValue(options, "port") ? Number(optionValue(options, "port")) : undefined;
@@ -118,6 +144,35 @@ async function semanticSearch(args: string[]): Promise<void> {
   const results = searchCorpus(query, corpus, { limit });
 
   console.log(JSON.stringify({ ok: true, query, resultCount: results.length, results }, null, 2));
+}
+
+async function planCartoon(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const prompt = options.positionals.join(" ");
+
+  if (!prompt) {
+    throw new ValidationError("plan:cartoon requires a prompt");
+  }
+
+  const corpus = await loadDefaultCorpus(optionValue(options, "corpus"));
+  const plan = planCartoonScene(prompt, corpus, {
+    title: optionValue(options, "title"),
+    width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined
+  });
+  const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, optionValue(options, "root"));
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        plan,
+        job: generatedJobSummary(job)
+      },
+      null,
+      2
+    )
+  );
 }
 
 interface ParsedOptions {
@@ -188,6 +243,8 @@ Commands:
   mcp:serve
   jsx:ping [--message TEXT] [--root DIR]
   jsx:cartoon [SCENE_JSON_PATH] [--root DIR]
+  jsx:export --output PATH [--format pdf|svg|png|jpg] [--root DIR]
+  plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--root DIR] [--corpus PATH]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
   semantic:search QUERY [--limit N] [--corpus PATH]
 

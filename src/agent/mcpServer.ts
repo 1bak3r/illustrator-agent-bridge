@@ -5,11 +5,13 @@ import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
 import { normalizeScene } from "../bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } from "../mcp/illustratorClient.js";
+import { planCartoonScene } from "../planner/cartoonPlanner.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
 
 const optionalRootSchema = z.string().min(1).optional();
 const optionalUrlSchema = z.string().url().optional();
 const optionalTokenSchema = z.string().min(1).optional();
+const exportFormatSchema = z.enum(["pdf", "svg", "png", "jpg"]);
 const semanticKindSchema = z
   .enum(["object_semantics", "style_reference", "publication_requirement", "document_state", "illustrator_capability"])
   .optional();
@@ -52,6 +54,33 @@ export function createAgentMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "plan_cartoon_scene_job",
+    {
+      title: "Plan Cartoon Scene and Create JSX Job",
+      description:
+        "Use local semantic search to plan a first-pass publication-style cartoon scene from a natural-language prompt, QA the scene, and create a JSX job.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ prompt, width, height, title, root }) => {
+      const corpus = await loadDefaultCorpus();
+      const plan = planCartoonScene(prompt, corpus, { width, height, title });
+      const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, root);
+      return jsonToolResult({
+        ok: true,
+        plan,
+        job: generatedJobSummary(job),
+        run: runInstructions(job)
+      });
+    }
+  );
+
+  server.registerTool(
     "bridge_create_ping_job",
     {
       title: "Create Illustrator Ping JSX Job",
@@ -86,6 +115,28 @@ export function createAgentMcpServer(): McpServer {
     async ({ scene, root }) => {
       const normalizedScene = normalizeScene(scene);
       const job = await createGeneratedJob({ kind: "cartoon_scene", scene: normalizedScene }, root);
+      return jsonToolResult({
+        ok: true,
+        job: generatedJobSummary(job),
+        run: runInstructions(job)
+      });
+    }
+  );
+
+  server.registerTool(
+    "bridge_create_export_job",
+    {
+      title: "Create Illustrator Export JSX Job",
+      description:
+        "Create a JSX job that exports the active Illustrator document to PDF, SVG, PNG, or JPG. Run it after a document exists in Illustrator.",
+      inputSchema: {
+        format: exportFormatSchema,
+        outputPath: z.string().min(1).max(1000),
+        root: optionalRootSchema
+      }
+    },
+    async ({ format, outputPath, root }) => {
+      const job = await createGeneratedJob({ kind: "export", format, outputPath }, root);
       return jsonToolResult({
         ok: true,
         job: generatedJobSummary(job),
@@ -157,14 +208,17 @@ export function createAgentMcpServer(): McpServer {
               preferredPath: "Illustrator Beta MCP when configured; generated JSX fallback otherwise.",
               tools: [
                 "semantic_search_visual_knowledge",
+                "plan_cartoon_scene_job",
                 "illustrator_beta_list_tools",
                 "illustrator_beta_call_tool",
                 "bridge_create_ping_job",
-                "bridge_create_cartoon_scene_job"
+                "bridge_create_cartoon_scene_job",
+                "bridge_create_export_job"
               ],
               generatedJobContract: {
                 runInIllustrator: "File > Scripts > Other Script",
-                result: "Each generated JSX job writes a JSON result file."
+                result: "Each generated JSX job writes a JSON result file.",
+                export: "Export jobs require an active Illustrator document."
               }
             },
             null,

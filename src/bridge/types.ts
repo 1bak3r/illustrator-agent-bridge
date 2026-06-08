@@ -1,4 +1,4 @@
-export type BridgeCommand = PingCommand | CartoonSceneCommand;
+export type BridgeCommand = PingCommand | CartoonSceneCommand | ExportCommand;
 
 export interface PingCommand {
   kind: "ping";
@@ -9,6 +9,14 @@ export interface CartoonSceneCommand {
   kind: "cartoon_scene";
   scene: CartoonScene;
 }
+
+export interface ExportCommand {
+  kind: "export";
+  format: ExportFormat;
+  outputPath: string;
+}
+
+export type ExportFormat = "pdf" | "svg" | "png" | "jpg";
 
 export interface CartoonScene {
   document?: SceneDocument;

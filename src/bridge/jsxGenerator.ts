@@ -1,4 +1,4 @@
-import type { BridgeCommand, CartoonScene, ElementStyle, GeneratedJob, SceneElement } from "./types.js";
+import type { BridgeCommand, CartoonScene, ElementStyle, ExportCommand, GeneratedJob, SceneElement } from "./types.js";
 
 const DEFAULT_WIDTH = 720;
 const DEFAULT_HEIGHT = 480;
@@ -13,7 +13,11 @@ export function generateJsx(command: BridgeCommand, options: GenerateOptions): s
     return generatePingJsx(command.message ?? "hello from illustrator-agent-bridge", options);
   }
 
-  return generateCartoonSceneJsx(command.scene, options);
+  if (command.kind === "cartoon_scene") {
+    return generateCartoonSceneJsx(command.scene, options);
+  }
+
+  return generateExportJsx(command, options);
 }
 
 function generatePingJsx(message: string, options: GenerateOptions): string {
@@ -61,6 +65,30 @@ function generateCartoonSceneJsx(scene: CartoonScene, options: GenerateOptions):
   ];
 
   return lines.join("\n");
+}
+
+function generateExportJsx(command: ExportCommand, options: GenerateOptions): string {
+  return [
+    "#target illustrator",
+    "(function () {",
+    runtimeFunctions(options),
+    "  try {",
+    "    if (app.documents.length === 0) {",
+    "      throw new Error('No active Illustrator document to export.');",
+    "    }",
+    "    var doc = app.activeDocument;",
+    `    var outputFile = new File(${jsonLiteral(command.outputPath)});`,
+    "    ensureParent(outputFile);",
+    exportStatement(command),
+    "    app.redraw();",
+    `    writeResult('{"ok":true,"jobId":${jsonLiteral(options.id)},"kind":"export","format":${jsonLiteral(command.format)},"outputPath":${jsonLiteral(command.outputPath)},"documentName":' + jsonString(doc.name) + ',"app":"Adobe Illustrator","version":' + jsonString(app.version) + '}');`,
+    "  } catch (e) {",
+    "    writeFailure(e);",
+    "    throw e;",
+    "  }",
+    "}());",
+    ""
+  ].join("\n");
 }
 
 function runtimeFunctions(options: GenerateOptions): string {
@@ -177,6 +205,42 @@ function drawElement(element: SceneElement, index: number): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function exportStatement(command: ExportCommand): string {
+  if (command.format === "pdf") {
+    return [
+      "    var pdfOptions = new PDFSaveOptions();",
+      "    pdfOptions.preserveEditability = true;",
+      "    doc.saveAs(outputFile, pdfOptions);"
+    ].join("\n");
+  }
+
+  if (command.format === "svg") {
+    return [
+      "    var svgOptions = new ExportOptionsSVG();",
+      "    svgOptions.embedRasterImages = true;",
+      "    doc.exportFile(outputFile, ExportType.SVG, svgOptions);"
+    ].join("\n");
+  }
+
+  if (command.format === "png") {
+    return [
+      "    var pngOptions = new ExportOptionsPNG24();",
+      "    pngOptions.antiAliasing = true;",
+      "    pngOptions.transparency = true;",
+      "    pngOptions.artBoardClipping = true;",
+      "    doc.exportFile(outputFile, ExportType.PNG24, pngOptions);"
+    ].join("\n");
+  }
+
+  return [
+    "    var jpgOptions = new ExportOptionsJPEG();",
+    "    jpgOptions.antiAliasing = true;",
+    "    jpgOptions.qualitySetting = 90;",
+    "    jpgOptions.artBoardClipping = true;",
+    "    doc.exportFile(outputFile, ExportType.JPEG, jpgOptions);"
+  ].join("\n");
 }
 
 function withStyleDefaults(style: ElementStyle | undefined): Required<ElementStyle> {

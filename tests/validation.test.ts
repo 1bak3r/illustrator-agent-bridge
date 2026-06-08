@@ -30,3 +30,18 @@ test("rejects invalid colors before JSX generation", () => {
     ValidationError
   );
 });
+
+test("normalizes export commands", () => {
+  assert.deepEqual(
+    normalizeCommand({
+      kind: "export",
+      format: "PDF",
+      outputPath: "out/figure.pdf"
+    }),
+    {
+      kind: "export",
+      format: "pdf",
+      outputPath: "out/figure.pdf"
+    }
+  );
+});

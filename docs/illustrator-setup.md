@@ -66,6 +66,18 @@ curl -sS http://127.0.0.1:4317/v1/jobs \
   --data-binary @<(node -e 'const fs=require("fs"); const scene=JSON.parse(fs.readFileSync("examples/cartoon-scene.json","utf8")); console.log(JSON.stringify({kind:"cartoon_scene", scene}))')
 ```
 
+Create an export job after Illustrator has an active document:
+
+```bash
+npm run jsx:export -- --format pdf --output ./var/exports/figure.pdf
+```
+
+Plan from a prompt, retrieve semantic evidence, run static QA, and create the scene job:
+
+```bash
+npm run plan:cartoon -- "cartoon lab scientist with flask"
+```
+
 ## Agent-Facing MCP Server
 
 Run the bridge as a stdio MCP server:
@@ -78,5 +90,7 @@ An MCP client can then call:
 
 - `bridge_create_ping_job`
 - `bridge_create_cartoon_scene_job`
+- `bridge_create_export_job`
+- `plan_cartoon_scene_job`
 - `illustrator_beta_list_tools`
 - `illustrator_beta_call_tool`

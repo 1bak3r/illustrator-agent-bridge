@@ -40,6 +40,12 @@ Agent-facing MCP:
 LLM MCP client -> illustrator-agent-bridge stdio MCP -> generated JSX or Illustrator Beta MCP
 ```
 
+Planned cartoon fallback:
+
+```text
+Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> export JSX -> visual inspection
+```
+
 ## Near-Term Milestones
 
 1. Prove native MCP discovery with `mcp:list-tools` on a machine running Illustrator Beta.

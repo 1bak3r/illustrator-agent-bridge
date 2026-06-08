@@ -2,6 +2,7 @@ import type {
   BridgeCommand,
   CartoonScene,
   ElementStyle,
+  ExportFormat,
   Point,
   SceneDocument,
   SceneElement
@@ -34,7 +35,25 @@ export function normalizeCommand(input: unknown): BridgeCommand {
     };
   }
 
+  if (kind === "export") {
+    return {
+      kind,
+      format: normalizeExportFormat(value.format),
+      outputPath: stringValue(value.outputPath, "outputPath", 1000)
+    };
+  }
+
   throw new ValidationError(`Unsupported command kind: ${kind}`);
+}
+
+function normalizeExportFormat(input: unknown): ExportFormat {
+  const format = stringValue(input, "format").toLowerCase();
+
+  if (format !== "pdf" && format !== "svg" && format !== "png" && format !== "jpg") {
+    throw new ValidationError("format must be pdf, svg, png, or jpg");
+  }
+
+  return format;
 }
 
 export function normalizeScene(input: unknown): CartoonScene {

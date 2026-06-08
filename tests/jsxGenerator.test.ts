@@ -40,3 +40,18 @@ test("generates named vector elements for a cartoon scene", () => {
   assert.match(jsx, /layer\.pathItems\.ellipse/);
   assert.match(jsx, /"head"/);
 });
+
+test("generates an Illustrator export JSX job", () => {
+  const jsx = generateJsx(
+    {
+      kind: "export",
+      format: "pdf",
+      outputPath: "C:/Users/example/out/figure.pdf"
+    },
+    { id: "job-3", resultPath: "C:/Users/example/out/result.json" }
+  );
+
+  assert.match(jsx, /PDFSaveOptions/);
+  assert.match(jsx, /doc\.saveAs\(outputFile, pdfOptions\)/);
+  assert.match(jsx, /figure\.pdf/);
+});

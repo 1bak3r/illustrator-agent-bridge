@@ -18,8 +18,10 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
   try {
     const listed = await client.listTools();
     assert.ok(listed.tools.some((tool) => tool.name === "semantic_search_visual_knowledge"));
+    assert.ok(listed.tools.some((tool) => tool.name === "plan_cartoon_scene_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_ping_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_cartoon_scene_job"));
+    assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_export_job"));
 
     const searchResult = await client.callTool({
       name: "semantic_search_visual_knowledge",
@@ -47,6 +49,19 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const body = JSON.parse(content[0]?.text ?? "");
     assert.equal(body.ok, true);
     assert.match(body.job.jobPath, /jobs\/.+\.jsx$/);
+
+    const planResult = await client.callTool({
+      name: "plan_cartoon_scene_job",
+      arguments: {
+        prompt: "cartoon lab scientist with flask",
+        root
+      }
+    });
+    const planContent = planResult.content as Array<{ type: string; text?: string }>;
+    const planBody = JSON.parse(planContent[0]?.text ?? "");
+    assert.equal(planBody.ok, true);
+    assert.equal(planBody.plan.qa.ok, true);
+    assert.match(planBody.job.jobPath, /jobs\/.+\.jsx$/);
   } finally {
     await client.close();
     await server.close();
