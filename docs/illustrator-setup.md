@@ -100,6 +100,12 @@ node dist/src/cli.js job:wait <scene-job-id> --timeout-ms 60000
 node dist/src/cli.js job:wait <export-job-id> --timeout-ms 60000
 ```
 
+5. Run export artifact QA:
+
+```bash
+node dist/src/cli.js qa:export ./var/exports/figure.pdf --format pdf --min-bytes 1000
+```
+
 ## Agent-Facing MCP Server
 
 Run the bridge as a stdio MCP server:
@@ -117,5 +123,6 @@ An MCP client can then call:
 - `prepare_cartoon_publication_workflow`
 - `bridge_get_job_status`
 - `bridge_wait_for_job_result`
+- `qa_export_artifact`
 - `illustrator_beta_list_tools`
 - `illustrator_beta_call_tool`

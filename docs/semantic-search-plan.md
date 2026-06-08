@@ -8,6 +8,8 @@ The first planner is `plan:cartoon` / `plan_cartoon_scene_job`. It retrieves evi
 
 The first orchestrated fallback is `workflow:cartoon` / `prepare_cartoon_publication_workflow`. It prepares the scene job, prepares the export job, and returns a runbook that an agent browser can follow while polling result JSON files with `job:wait` or `bridge_wait_for_job_result`.
 
+After export, `qa:export` / `qa_export_artifact` runs structural artifact QA. It does not replace human/LLM visual inspection, but it catches missing files, wrong formats, tiny exports, missing SVG vector elements, and missing PDF page structure before the agent proceeds.
+
 ## Retrieval Targets
 
 - Object semantics: what parts and proportions define a requested object.

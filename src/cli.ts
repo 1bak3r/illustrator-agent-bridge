@@ -8,6 +8,7 @@ import { startBridgeServer } from "./bridge/server.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, McpConfigError } from "./mcp/illustratorClient.js";
 import { planCartoonScene } from "./planner/cartoonPlanner.js";
+import { ExportQaError, inspectExportArtifact } from "./qa/exportQa.js";
 import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
 import { prepareCartoonWorkflow } from "./workflow/cartoonWorkflow.js";
 
@@ -44,6 +45,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "job:wait":
       await jobWait(rest);
+      return;
+    case "qa:export":
+      await qaExport(rest);
       return;
     case "serve":
       await serve(rest);
@@ -185,6 +189,23 @@ async function jobWait(args: string[]): Promise<void> {
   console.log(JSON.stringify({ ok: true, job: status }, null, 2));
 }
 
+async function qaExport(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const path = options.positionals[0];
+
+  if (!path) {
+    throw new ValidationError("qa:export requires an export artifact path");
+  }
+
+  const report = await inspectExportArtifact(path, {
+    format: optionalExportFormat(optionValue(options, "format")),
+    minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
+    minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
+    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined
+  });
+  console.log(JSON.stringify({ ok: report.ok, report }, null, 2));
+}
+
 async function planCartoon(args: string[]): Promise<void> {
   const options = parseOptions(args);
   const prompt = options.positionals.join(" ");
@@ -314,6 +335,7 @@ Commands:
   workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--root DIR] [--corpus PATH]
   job:status JOB_ID [--root DIR]
   job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
+  qa:export PATH [--format pdf|svg|png|jpg] [--min-bytes N] [--min-width N] [--min-height N]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
   semantic:search QUERY [--limit N] [--corpus PATH]
 
@@ -326,7 +348,8 @@ Environment:
 }
 
 main(process.argv.slice(2)).catch((error) => {
-  const expected = error instanceof ValidationError || error instanceof McpConfigError || error instanceof JobResultError;
+  const expected =
+    error instanceof ValidationError || error instanceof McpConfigError || error instanceof JobResultError || error instanceof ExportQaError;
   console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
   process.exitCode = expected ? 2 : 1;
 });

@@ -43,7 +43,7 @@ LLM MCP client -> illustrator-agent-bridge stdio MCP -> generated JSX or Illustr
 Planned cartoon fallback:
 
 ```text
-Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> wait result -> export JSX -> wait result -> visual inspection
+Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> wait result -> export JSX -> wait result -> export artifact QA -> visual inspection
 ```
 
 ## Near-Term Milestones

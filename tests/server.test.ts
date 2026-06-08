@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startBridgeServer } from "../src/bridge/server.js";
@@ -64,6 +64,29 @@ test("HTTP bridge prepares a cartoon workflow", async () => {
     assert.equal(body.runbook.length, 4);
     await access(body.sceneJob.jobPath);
     await access(body.exportJob.jobPath);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge QA checks an exported SVG", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-qa-"));
+  const server = await startBridgeServer({ port: 0, root });
+  const svgPath = join(root, "exports", "figure.svg");
+
+  try {
+    await mkdir(join(root, "exports"), { recursive: true });
+    await writeFile(svgPath, `<svg width="720" height="480"><rect width="720" height="480"/></svg>`, "utf8");
+    const response = await fetch(`${server.url}/v1/qa/export`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: svgPath, minBytes: 1 })
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { ok: boolean; report: { format: string } };
+    assert.equal(body.ok, true);
+    assert.equal(body.report.format, "svg");
   } finally {
     await server.close();
   }

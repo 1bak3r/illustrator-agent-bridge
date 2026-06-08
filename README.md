@@ -34,6 +34,12 @@ node dist/src/cli.js job:status <job-id>
 node dist/src/cli.js job:wait <job-id> --timeout-ms 60000
 ```
 
+Run structural QA on the exported file:
+
+```bash
+node dist/src/cli.js qa:export ./var/exports/figure.svg --min-width 360 --min-height 240
+```
+
 For the native MCP path, copy the server URL and key from Illustrator Beta `MCP & Tools`, then:
 
 ```bash
@@ -58,6 +64,7 @@ That server exposes tools to create Illustrator JSX jobs and to proxy Illustrato
 It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
 Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
+Use `qa_export_artifact` after export to check basic file size, format signature, dimensions, and SVG/PDF structure.
 
 Create a job over HTTP:
 

@@ -7,6 +7,7 @@ import { readJobStatus, waitForJobResult } from "../bridge/results.js";
 import { normalizeScene } from "../bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } from "../mcp/illustratorClient.js";
 import { planCartoonScene } from "../planner/cartoonPlanner.js";
+import { inspectExportArtifact } from "../qa/exportQa.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
 
@@ -51,6 +52,29 @@ export function createAgentMcpServer(): McpServer {
         query,
         resultCount: results.length,
         results
+      });
+    }
+  );
+
+  server.registerTool(
+    "qa_export_artifact",
+    {
+      title: "QA Exported Illustrator Artifact",
+      description:
+        "Inspect an exported Illustrator artifact for basic publication workflow gates: file size, format signature, dimensions when available, and SVG/PDF structure.",
+      inputSchema: {
+        path: z.string().min(1).max(1000),
+        format: exportFormatSchema.optional(),
+        minBytes: z.number().int().min(0).optional(),
+        minWidth: z.number().int().min(1).optional(),
+        minHeight: z.number().int().min(1).optional()
+      }
+    },
+    async ({ path, format, minBytes, minWidth, minHeight }) => {
+      const report = await inspectExportArtifact(path, { format, minBytes, minWidth, minHeight });
+      return jsonToolResult({
+        ok: report.ok,
+        report
       });
     }
   );
@@ -289,12 +313,14 @@ export function createAgentMcpServer(): McpServer {
                 "bridge_create_cartoon_scene_job",
                 "bridge_create_export_job",
                 "bridge_get_job_status",
-                "bridge_wait_for_job_result"
+                "bridge_wait_for_job_result",
+                "qa_export_artifact"
               ],
               generatedJobContract: {
                 runInIllustrator: "File > Scripts > Other Script",
                 result: "Each generated JSX job writes a JSON result file.",
-                export: "Export jobs require an active Illustrator document."
+                export: "Export jobs require an active Illustrator document.",
+                qa: "Run qa_export_artifact after an export job writes ok=true."
               }
             },
             null,

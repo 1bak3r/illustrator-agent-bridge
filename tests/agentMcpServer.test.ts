@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -25,6 +25,7 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_export_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_get_job_status"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_wait_for_job_result"));
+    assert.ok(listed.tools.some((tool) => tool.name === "qa_export_artifact"));
 
     const searchResult = await client.callTool({
       name: "semantic_search_visual_knowledge",
@@ -78,6 +79,19 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const workflowBody = JSON.parse(workflowContent[0]?.text ?? "");
     assert.equal(workflowBody.ok, true);
     assert.equal(workflowBody.runbook.length, 4);
+
+    const svgPath = join(root, "figure.svg");
+    await writeFile(svgPath, `<svg width="720" height="480"><rect width="720" height="480"/></svg>`, "utf8");
+    const qaResult = await client.callTool({
+      name: "qa_export_artifact",
+      arguments: {
+        path: svgPath,
+        minBytes: 1
+      }
+    });
+    const qaContent = qaResult.content as Array<{ type: string; text?: string }>;
+    const qaBody = JSON.parse(qaContent[0]?.text ?? "");
+    assert.equal(qaBody.ok, true);
   } finally {
     await client.close();
     await server.close();

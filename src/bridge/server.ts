@@ -4,6 +4,7 @@ import { resolveBridgeRoot } from "./files.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
 import { JobResultError, readJobStatus } from "./results.js";
 import { normalizeCommand, ValidationError } from "./validation.js";
+import { ExportQaError, inspectExportArtifact } from "../qa/exportQa.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
 
 export interface ServerOptions {
@@ -91,6 +92,18 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
     return;
   }
 
+  if (method === "POST" && url.pathname === "/v1/qa/export") {
+    const body = objectBody(await readJson(request));
+    const report = await inspectExportArtifact(stringBodyValue(body.path, "path"), {
+      format: optionalExportFormat(body.format),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight")
+    });
+    writeJson(response, 200, { ok: report.ok, report });
+    return;
+  }
+
   if (method === "GET" && url.pathname.startsWith("/v1/jobs/") && url.pathname.endsWith("/status")) {
     const id = url.pathname.split("/")[3];
     const status = await readJobStatus(id, root);
@@ -148,7 +161,7 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
 }
 
 function statusForError(error: unknown): number {
-  if (error instanceof ValidationError || error instanceof JobResultError) {
+  if (error instanceof ValidationError || error instanceof JobResultError || error instanceof ExportQaError) {
     return 400;
   }
 
