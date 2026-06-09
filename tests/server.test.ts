@@ -61,6 +61,8 @@ test("HTTP bridge serves the browser dashboard", async () => {
     const html = await response.text();
     assert.match(html, /Illustrator Agent Bridge/);
     assert.match(html, /\/v1\/workflows\/cartoon\/execute/);
+    assert.match(html, /name="planner"/);
+    assert.match(html, /OPENAI_MODEL or gpt-5\.5/);
     assert.match(html, /minNonBlankRatio/);
   } finally {
     await server.close();
@@ -78,18 +80,21 @@ test("HTTP bridge prepares a cartoon workflow", async () => {
       body: JSON.stringify({
         prompt: "cartoon lab scientist with flask",
         outputPath: "var/exports/http-workflow.pdf",
-        format: "pdf"
+        format: "pdf",
+        planner: "deterministic"
       })
     });
 
     assert.equal(response.status, 201);
     const body = (await response.json()) as {
       ok: boolean;
+      plan: { planner: string };
       sceneJob: { jobPath: string };
       exportJob: { jobPath: string };
       runbook: unknown[];
     };
     assert.equal(body.ok, true);
+    assert.equal(body.plan.planner, "deterministic");
     assert.equal(body.runbook.length, 4);
     await access(body.sceneJob.jobPath);
     await access(body.exportJob.jobPath);

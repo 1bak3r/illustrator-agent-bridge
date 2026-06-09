@@ -49,10 +49,10 @@ Browser dashboard:
 Browser agent -> local dashboard -> bridge HTTP API -> workflow execution or job status
 ```
 
-Planned cartoon fallback:
+Cartoon fallback:
 
 ```text
-Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> launch/manual run -> wait result -> export JSX -> launch/manual run -> wait result -> export artifact QA -> visual inspection
+Prompt -> semantic search -> deterministic or OpenAI scene planner -> static QA -> generated scene JSX -> launch/manual run -> wait result -> export JSX -> launch/manual run -> wait result -> export artifact QA -> visual inspection
 ```
 
 The executor path wraps that sequence for agents:
@@ -67,4 +67,4 @@ execute_cartoon_publication_workflow / workflow:execute-cartoon -> prepare workf
 2. Add a small vocabulary of high-level vector commands: create document, create named layer, draw styled shapes, edit text, export PDF/SVG/PNG.
 3. Add semantic retrieval for "what is this object/style?" before generating scene plans.
 4. Add visual QA: export a PNG, inspect dimensions/nonblank pixels, and iterate before declaring artwork done. The bridge now performs PNG nonblank pixel checks; iteration is the next layer.
-5. Replace the deterministic planner with an LLM planner that still emits the same validated scene contract.
+5. Expand the optional OpenAI planner with stronger art-direction prompts, regression examples, and visual iteration. The first LLM path now emits the same validated scene contract as the deterministic planner.

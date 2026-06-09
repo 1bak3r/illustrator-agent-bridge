@@ -2,7 +2,8 @@ import { isAbsolute, resolve } from "node:path";
 import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
 import type { ExportFormat, GeneratedJob } from "../bridge/types.js";
-import { planCartoonScene, type CartoonPlan } from "../planner/cartoonPlanner.js";
+import type { CartoonPlan } from "../planner/cartoonPlanner.js";
+import { planCartoonSceneWithMode, type PlannerMode } from "../planner/plannerRouter.js";
 import { loadDefaultCorpus } from "../semantic/search.js";
 
 export interface PrepareCartoonWorkflowOptions {
@@ -14,6 +15,10 @@ export interface PrepareCartoonWorkflowOptions {
   height?: number;
   title?: string;
   corpusPath?: string;
+  plannerMode?: PlannerMode;
+  openAiModel?: string;
+  openAiApiKey?: string;
+  openAiBaseUrl?: string;
 }
 
 export interface CartoonWorkflow {
@@ -37,10 +42,14 @@ export interface WorkflowStep {
 export async function prepareCartoonWorkflow(options: PrepareCartoonWorkflowOptions): Promise<CartoonWorkflow> {
   const format = options.format ?? "pdf";
   const corpus = await loadDefaultCorpus(options.corpusPath);
-  const plan = planCartoonScene(options.prompt, corpus, {
+  const plan = await planCartoonSceneWithMode(options.prompt, corpus, {
     width: options.width,
     height: options.height,
-    title: options.title
+    title: options.title,
+    plannerMode: options.plannerMode,
+    openAiModel: options.openAiModel,
+    openAiApiKey: options.openAiApiKey,
+    openAiBaseUrl: options.openAiBaseUrl
   });
   const sceneJob = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, options.root);
   const exportJob = await createGeneratedJob(

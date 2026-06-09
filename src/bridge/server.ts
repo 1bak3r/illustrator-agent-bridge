@@ -6,6 +6,8 @@ import { generatedJobSummary } from "./jsxGenerator.js";
 import { LaunchJobError, launchJsxJob, type LaunchPlatform } from "./launcher.js";
 import { JobResultError, normalizeJobId, readJobStatus } from "./results.js";
 import { normalizeCommand, ValidationError } from "./validation.js";
+import { OpenAiPlannerError } from "../planner/openAiCartoonPlanner.js";
+import type { PlannerMode } from "../planner/plannerRouter.js";
 import { ExportQaError, inspectExportArtifact } from "../qa/exportQa.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
@@ -109,6 +111,8 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       width: optionalNumberBodyValue(body.width, "width"),
       height: optionalNumberBodyValue(body.height, "height"),
       title: optionalStringBodyValue(body.title, "title"),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
       root
     });
     writeJson(response, 201, workflow);
@@ -124,6 +128,8 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       width: optionalNumberBodyValue(body.width, "width"),
       height: optionalNumberBodyValue(body.height, "height"),
       title: optionalStringBodyValue(body.title, "title"),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
       launchPlatform: optionalLaunchPlatform(body.platform),
       appPath: optionalStringBodyValue(body.appPath, "appPath"),
       dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
@@ -229,7 +235,13 @@ function parseJson(text: string): unknown {
 }
 
 function statusForError(error: unknown): number {
-  if (error instanceof ValidationError || error instanceof JobResultError || error instanceof ExportQaError || error instanceof LaunchJobError) {
+  if (
+    error instanceof ValidationError ||
+    error instanceof JobResultError ||
+    error instanceof ExportQaError ||
+    error instanceof LaunchJobError ||
+    error instanceof OpenAiPlannerError
+  ) {
     return 400;
   }
 
@@ -315,6 +327,19 @@ function optionalLaunchPlatform(input: unknown): LaunchPlatform | undefined {
   const value = stringBodyValue(input, "platform").toLowerCase();
   if (value !== "auto" && value !== "macos" && value !== "windows" && value !== "wsl" && value !== "linux") {
     throw new ValidationError("platform must be auto, macos, windows, wsl, or linux");
+  }
+
+  return value;
+}
+
+function optionalPlannerMode(input: unknown): PlannerMode | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "planner").toLowerCase();
+  if (value !== "deterministic" && value !== "auto" && value !== "openai") {
+    throw new ValidationError("planner must be deterministic, auto, or openai");
   }
 
   return value;

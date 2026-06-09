@@ -8,7 +8,7 @@ import { launchJsxJob } from "../bridge/launcher.js";
 import { normalizeJobId, readJobStatus, waitForJobResult } from "../bridge/results.js";
 import { normalizeScene } from "../bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } from "../mcp/illustratorClient.js";
-import { planCartoonScene } from "../planner/cartoonPlanner.js";
+import { planCartoonSceneWithMode } from "../planner/plannerRouter.js";
 import { inspectExportArtifact } from "../qa/exportQa.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
@@ -19,6 +19,7 @@ const optionalUrlSchema = z.string().url().optional();
 const optionalTokenSchema = z.string().min(1).optional();
 const exportFormatSchema = z.enum(["pdf", "svg", "png", "jpg"]);
 const launchPlatformSchema = z.enum(["auto", "macos", "windows", "wsl", "linux"]).optional();
+const plannerModeSchema = z.enum(["deterministic", "auto", "openai"]).optional();
 const semanticKindSchema = z
   .enum(["object_semantics", "style_reference", "publication_requirement", "document_state", "illustrator_capability"])
   .optional();
@@ -97,10 +98,12 @@ export function createAgentMcpServer(): McpServer {
         width: z.number().int().min(360).max(14400).optional(),
         height: z.number().int().min(240).max(14400).optional(),
         title: z.string().min(1).max(120).optional(),
+        planner: plannerModeSchema,
+        model: z.string().min(1).max(120).optional(),
         root: optionalRootSchema
       }
     },
-    async ({ prompt, outputPath, format, width, height, title, root }) => {
+    async ({ prompt, outputPath, format, width, height, title, planner, model, root }) => {
       const workflow = await prepareCartoonWorkflow({
         prompt,
         outputPath,
@@ -108,6 +111,8 @@ export function createAgentMcpServer(): McpServer {
         width,
         height,
         title,
+        plannerMode: planner,
+        openAiModel: model,
         root
       });
       return jsonToolResult(workflow);
@@ -127,6 +132,8 @@ export function createAgentMcpServer(): McpServer {
         width: z.number().int().min(360).max(14400).optional(),
         height: z.number().int().min(240).max(14400).optional(),
         title: z.string().min(1).max(120).optional(),
+        planner: plannerModeSchema,
+        model: z.string().min(1).max(120).optional(),
         platform: launchPlatformSchema,
         appPath: z.string().min(1).max(1000).optional(),
         dryRun: z.boolean().optional(),
@@ -148,6 +155,8 @@ export function createAgentMcpServer(): McpServer {
       width,
       height,
       title,
+      planner,
+      model,
       platform: launchPlatform,
       appPath,
       dryRun,
@@ -168,6 +177,8 @@ export function createAgentMcpServer(): McpServer {
         width,
         height,
         title,
+        plannerMode: planner,
+        openAiModel: model,
         launchPlatform,
         appPath,
         dryRun,
@@ -196,12 +207,14 @@ export function createAgentMcpServer(): McpServer {
         width: z.number().int().min(360).max(14400).optional(),
         height: z.number().int().min(240).max(14400).optional(),
         title: z.string().min(1).max(120).optional(),
+        planner: plannerModeSchema,
+        model: z.string().min(1).max(120).optional(),
         root: optionalRootSchema
       }
     },
-    async ({ prompt, width, height, title, root }) => {
+    async ({ prompt, width, height, title, planner, model, root }) => {
       const corpus = await loadDefaultCorpus();
-      const plan = planCartoonScene(prompt, corpus, { width, height, title });
+      const plan = await planCartoonSceneWithMode(prompt, corpus, { width, height, title, plannerMode: planner, openAiModel: model });
       const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, root);
       return jsonToolResult({
         ok: true,

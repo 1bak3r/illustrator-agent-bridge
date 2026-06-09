@@ -328,6 +328,14 @@ export function dashboardHtml(): string {
         </label>
         <div class="grid three">
           <label>
+            Planner
+            <select name="planner">
+              <option value="deterministic">deterministic</option>
+              <option value="auto">auto</option>
+              <option value="openai">openai</option>
+            </select>
+          </label>
+          <label>
             Format
             <select name="format">
               <option value="png">png</option>
@@ -364,6 +372,10 @@ export function dashboardHtml(): string {
         <label>
           App
           <input name="appPath" placeholder="Adobe Illustrator">
+        </label>
+        <label>
+          Model
+          <input name="model" placeholder="OPENAI_MODEL or gpt-5.5">
         </label>
         <div class="toggles">
           <label class="toggle"><input type="checkbox" name="dryRun" checked> Dry run</label>
@@ -418,6 +430,7 @@ export function dashboardHtml(): string {
       const body = {
         prompt: String(data.get("prompt") || ""),
         outputPath: String(data.get("outputPath") || ""),
+        planner: String(data.get("planner") || "deterministic"),
         format: String(data.get("format") || "png"),
         platform: String(data.get("platform") || "auto"),
         width: numberValue(data, "width"),
@@ -429,6 +442,8 @@ export function dashboardHtml(): string {
       };
       const appPath = String(data.get("appPath") || "").trim();
       if (appPath) body.appPath = appPath;
+      const model = String(data.get("model") || "").trim();
+      if (model) body.model = model;
       Object.keys(body).forEach((key) => body[key] === undefined && delete body[key]);
       return body;
     }
@@ -516,6 +531,8 @@ export function dashboardHtml(): string {
             prompt: body.prompt,
             outputPath: body.outputPath,
             format: body.format,
+            planner: body.planner,
+            model: body.model,
             width: body.width,
             height: body.height
           })

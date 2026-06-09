@@ -6,6 +6,8 @@ The repo currently includes a deterministic local search baseline in `data/seman
 
 The first planner is `plan:cartoon` / `plan_cartoon_scene_job`. It retrieves evidence, builds a conservative vector scene, runs static QA checks for figure size, text size, named elements, stroke consistency, and element count, then generates an Illustrator JSX job.
 
+Planner mode defaults to `deterministic`. Passing `--planner auto` or `planner: "auto"` uses the OpenAI scene planner when `OPENAI_API_KEY` is configured, otherwise it records a deterministic fallback note. Passing `--planner openai` requires the OpenAI planner. The LLM path uses retrieved semantic evidence as input, asks for structured scene output, and still normalizes and validates the scene before any JSX is generated.
+
 The first orchestrated fallback is `workflow:cartoon` / `prepare_cartoon_publication_workflow`. It prepares the scene job, prepares the export job, and returns a runbook that an agent browser can follow while launching generated JSX with `job:launch` or `bridge_launch_job` and polling result JSON files with `job:wait` or `bridge_wait_for_job_result`.
 
 The executable fallback is `workflow:execute-cartoon` / `execute_cartoon_publication_workflow`. It uses the same retrieval and planner contract, then performs launch, wait, export, and artifact QA steps. Agents should call it with dry-run enabled before attempting a live Illustrator launch.
@@ -32,7 +34,7 @@ Each indexed item should include:
 
 ## Planner Contract
 
-The LLM planner should produce:
+The planner should produce:
 
 1. Retrieved evidence IDs used.
 2. A scene plan in semantic terms.

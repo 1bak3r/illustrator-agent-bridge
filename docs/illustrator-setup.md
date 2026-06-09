@@ -90,6 +90,16 @@ Plan from a prompt, retrieve semantic evidence, run static QA, and create the sc
 npm run plan:cartoon -- "cartoon lab scientist with flask"
 ```
 
+Use the optional OpenAI planner by setting an API key and choosing `auto` or `openai`:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="gpt-5.5"
+npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner auto
+```
+
+`auto` falls back to the deterministic planner when `OPENAI_API_KEY` is not set. `openai` requires the key and returns an error if planning cannot call OpenAI.
+
 Prepare a complete prompt-to-export fallback runbook:
 
 ```bash

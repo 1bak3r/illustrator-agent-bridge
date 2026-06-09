@@ -9,7 +9,8 @@ import { JobResultError, normalizeJobId, readJobStatus, waitForJobResult } from 
 import { startBridgeServer } from "./bridge/server.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, McpConfigError } from "./mcp/illustratorClient.js";
-import { planCartoonScene } from "./planner/cartoonPlanner.js";
+import { OpenAiPlannerError } from "./planner/openAiCartoonPlanner.js";
+import { planCartoonSceneWithMode, type PlannerMode } from "./planner/plannerRouter.js";
 import { ExportQaError, inspectExportArtifact } from "./qa/exportQa.js";
 import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
 import { executeCartoonWorkflow } from "./workflow/cartoonExecutor.js";
@@ -243,10 +244,12 @@ async function planCartoon(args: string[]): Promise<void> {
   }
 
   const corpus = await loadDefaultCorpus(optionValue(options, "corpus"));
-  const plan = planCartoonScene(prompt, corpus, {
+  const plan = await planCartoonSceneWithMode(prompt, corpus, {
     title: optionValue(options, "title"),
     width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
-    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined,
+    plannerMode: optionalPlannerMode(optionValue(options, "planner")),
+    openAiModel: optionValue(options, "model")
   });
   const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, optionValue(options, "root"));
 
@@ -284,7 +287,9 @@ async function workflowCartoon(args: string[]): Promise<void> {
     corpusPath: optionValue(options, "corpus"),
     title: optionValue(options, "title"),
     width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
-    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined,
+    plannerMode: optionalPlannerMode(optionValue(options, "planner")),
+    openAiModel: optionValue(options, "model")
   });
 
   console.log(JSON.stringify(workflow, null, 2));
@@ -323,7 +328,9 @@ async function workflowExecuteCartoon(args: string[]): Promise<void> {
     minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
     minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
     minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
-    minNonBlankRatio: optionValue(options, "min-nonblank-ratio") ? Number(optionValue(options, "min-nonblank-ratio")) : undefined
+    minNonBlankRatio: optionValue(options, "min-nonblank-ratio") ? Number(optionValue(options, "min-nonblank-ratio")) : undefined,
+    plannerMode: optionalPlannerMode(optionValue(options, "planner")),
+    openAiModel: optionValue(options, "model")
   });
 
   console.log(JSON.stringify(execution, null, 2));
@@ -425,9 +432,9 @@ Commands:
   jsx:ping [--message TEXT] [--root DIR]
   jsx:cartoon [SCENE_JSON_PATH] [--root DIR]
   jsx:export --output PATH [--format pdf|svg|png|jpg] [--root DIR]
-  plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--root DIR] [--corpus PATH]
-  workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--root DIR] [--corpus PATH]
-  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
+  plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--planner deterministic|auto|openai] [--model MODEL] [--root DIR] [--corpus PATH]
+  workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--planner deterministic|auto|openai] [--model MODEL] [--root DIR] [--corpus PATH]
+  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--planner deterministic|auto|openai] [--model MODEL] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   job:status JOB_ID [--root DIR]
   job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
   job:launch JOB_ID [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--dry-run] [--root DIR]
@@ -440,6 +447,9 @@ Environment:
   ILLUSTRATOR_MCP_TOKEN     Bearer key copied from Illustrator Beta MCP & Tools
   ILLUSTRATOR_AGENT_BRIDGE_ROOT  Generated job/result root, default ./var
   ILLUSTRATOR_SEMANTIC_CORPUS    Semantic corpus JSON path, default ./data/semantic-corpus.json
+  OPENAI_API_KEY            Enables --planner auto/openai LLM scene planning
+  OPENAI_MODEL              Optional OpenAI planner model, default gpt-5.5
+  OPENAI_BASE_URL           Optional OpenAI API base URL, default https://api.openai.com/v1
 `);
 }
 
@@ -449,7 +459,8 @@ main(process.argv.slice(2)).catch((error) => {
     error instanceof McpConfigError ||
     error instanceof JobResultError ||
     error instanceof ExportQaError ||
-    error instanceof LaunchJobError;
+    error instanceof LaunchJobError ||
+    error instanceof OpenAiPlannerError;
   console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
   process.exitCode = expected ? 2 : 1;
 });
@@ -475,6 +486,19 @@ function optionalLaunchPlatform(input: string | undefined): LaunchPlatform | und
   const value = input.toLowerCase();
   if (value !== "auto" && value !== "macos" && value !== "windows" && value !== "wsl" && value !== "linux") {
     throw new ValidationError("platform must be auto, macos, windows, wsl, or linux");
+  }
+
+  return value;
+}
+
+function optionalPlannerMode(input: string | undefined): PlannerMode | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = input.toLowerCase();
+  if (value !== "deterministic" && value !== "auto" && value !== "openai") {
+    throw new ValidationError("planner must be deterministic, auto, or openai");
   }
 
   return value;

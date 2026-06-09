@@ -12,6 +12,7 @@ export interface CartoonPlanOptions {
 
 export interface CartoonPlan {
   prompt: string;
+  planner: "deterministic" | "openai";
   evidence: SemanticSearchResult[];
   scene: CartoonScene;
   qa: SceneQaReport;
@@ -31,6 +32,7 @@ export function planCartoonScene(prompt: string, corpus: SemanticItem[], options
 
   return {
     prompt: trimmedPrompt,
+    planner: "deterministic",
     evidence,
     scene,
     qa,

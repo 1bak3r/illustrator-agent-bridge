@@ -16,8 +16,17 @@ npm run jsx:ping
 npm run jsx:cartoon
 npm run semantic:search -- "cartoon lab flask"
 npm run plan:cartoon -- "cartoon lab scientist with flask"
+npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner auto
 npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
 npm run workflow:execute-cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.svg --format svg --dry-run
+```
+
+Optional LLM planning uses the OpenAI Responses API with Structured Outputs, then validates the returned scene through the same bridge contract before writing JSX:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="gpt-5.5"
+npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner openai
 ```
 
 The `jsx:*` commands write jobs under `var/jobs/` and expected results under `var/results/`. In Illustrator, run a generated job with `File > Scripts > Other Script`, then inspect the matching result JSON.
@@ -76,6 +85,8 @@ Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job
 Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.
 Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
 Use `qa_export_artifact` after export to check file size, format signature, dimensions, SVG/PDF structure, and PNG nonblank pixel content.
+
+The planner defaults to `deterministic`. Set `--planner auto` or pass `planner: "auto"` to use the OpenAI planner when `OPENAI_API_KEY` is configured, with deterministic fallback when it is not. Set `--planner openai` to require OpenAI planning. `OPENAI_MODEL` defaults to `gpt-5.5`, and `OPENAI_BASE_URL` defaults to `https://api.openai.com/v1`. The dashboard exposes the same planner and model controls.
 
 Create a job over HTTP:
 
