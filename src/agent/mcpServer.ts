@@ -11,6 +11,7 @@ import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } fr
 import { planCartoonScene } from "../planner/cartoonPlanner.js";
 import { inspectExportArtifact } from "../qa/exportQa.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
+import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
 
 const optionalRootSchema = z.string().min(1).optional();
@@ -109,6 +110,74 @@ export function createAgentMcpServer(): McpServer {
         root
       });
       return jsonToolResult(workflow);
+    }
+  );
+
+  server.registerTool(
+    "execute_cartoon_publication_workflow",
+    {
+      title: "Execute Cartoon Publication Workflow",
+      description:
+        "Prepare a semantic cartoon workflow, launch scene/export JSX jobs in order, optionally wait for Illustrator result JSON, and run export artifact QA.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000),
+        outputPath: z.string().min(1).max(1000),
+        format: exportFormatSchema.optional(),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        platform: launchPlatformSchema,
+        appPath: z.string().min(1).max(1000).optional(),
+        dryRun: z.boolean().optional(),
+        waitForResults: z.boolean().optional(),
+        timeoutMs: z.number().int().min(0).max(600_000).optional(),
+        intervalMs: z.number().int().min(100).max(60_000).optional(),
+        skipQa: z.boolean().optional(),
+        minBytes: z.number().int().min(0).optional(),
+        minWidth: z.number().int().min(1).optional(),
+        minHeight: z.number().int().min(1).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({
+      prompt,
+      outputPath,
+      format,
+      width,
+      height,
+      title,
+      platform: launchPlatform,
+      appPath,
+      dryRun,
+      waitForResults,
+      timeoutMs,
+      intervalMs,
+      skipQa,
+      minBytes,
+      minWidth,
+      minHeight,
+      root
+    }) => {
+      const execution = await executeCartoonWorkflow({
+        prompt,
+        outputPath,
+        format,
+        width,
+        height,
+        title,
+        launchPlatform,
+        appPath,
+        dryRun,
+        waitForResults,
+        timeoutMs,
+        intervalMs,
+        skipQa,
+        minBytes,
+        minWidth,
+        minHeight,
+        root
+      });
+      return jsonToolResult(execution);
     }
   );
 
@@ -330,6 +399,7 @@ export function createAgentMcpServer(): McpServer {
               tools: [
                 "semantic_search_visual_knowledge",
                 "prepare_cartoon_publication_workflow",
+                "execute_cartoon_publication_workflow",
                 "plan_cartoon_scene_job",
                 "illustrator_beta_list_tools",
                 "illustrator_beta_call_tool",

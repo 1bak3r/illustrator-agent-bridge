@@ -17,6 +17,7 @@ npm run jsx:cartoon
 npm run semantic:search -- "cartoon lab flask"
 npm run plan:cartoon -- "cartoon lab scientist with flask"
 npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
+npm run workflow:execute-cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.svg --format svg --dry-run
 ```
 
 The `jsx:*` commands write jobs under `var/jobs/` and expected results under `var/results/`. In Illustrator, run a generated job with `File > Scripts > Other Script`, then inspect the matching result JSON.
@@ -70,6 +71,7 @@ That server exposes tools to create Illustrator JSX jobs and to proxy Illustrato
 It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
 Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
+Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.
 Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
 Use `qa_export_artifact` after export to check basic file size, format signature, dimensions, and SVG/PDF structure.
 
@@ -87,6 +89,14 @@ Launch a generated job over HTTP:
 curl -sS http://127.0.0.1:4317/v1/jobs/<job-id>/launch \
   -H 'content-type: application/json' \
   -d '{"dryRun":true,"platform":"macos","appPath":"Adobe Illustrator"}'
+```
+
+Execute a cartoon workflow dry-run over HTTP:
+
+```bash
+curl -sS http://127.0.0.1:4317/v1/workflows/cartoon/execute \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"cartoon lab scientist with flask","outputPath":"var/exports/figure.svg","format":"svg","dryRun":true,"platform":"macos"}'
 ```
 
 ## Why This Shape

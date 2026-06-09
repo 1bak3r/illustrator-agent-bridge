@@ -90,6 +90,12 @@ Prepare a complete prompt-to-export fallback runbook:
 npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
 ```
 
+Prepare and execute the same workflow through the launcher. Use dry-run first:
+
+```bash
+npm run workflow:execute-cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.svg --format svg --dry-run --platform auto
+```
+
 The workflow returns two generated JSX jobs:
 
 1. Launch or manually run the scene job in Illustrator:
@@ -138,6 +144,7 @@ An MCP client can then call:
 - `bridge_launch_job`
 - `plan_cartoon_scene_job`
 - `prepare_cartoon_publication_workflow`
+- `execute_cartoon_publication_workflow`
 - `bridge_get_job_status`
 - `bridge_wait_for_job_result`
 - `qa_export_artifact`

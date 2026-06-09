@@ -12,6 +12,7 @@ import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, Mcp
 import { planCartoonScene } from "./planner/cartoonPlanner.js";
 import { ExportQaError, inspectExportArtifact } from "./qa/exportQa.js";
 import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
+import { executeCartoonWorkflow } from "./workflow/cartoonExecutor.js";
 import { prepareCartoonWorkflow } from "./workflow/cartoonWorkflow.js";
 
 async function main(argv: string[]): Promise<void> {
@@ -41,6 +42,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "workflow:cartoon":
       await workflowCartoon(rest);
+      return;
+    case "workflow:execute-cartoon":
+      await workflowExecuteCartoon(rest);
       return;
     case "job:status":
       await jobStatus(rest);
@@ -285,13 +289,51 @@ async function workflowCartoon(args: string[]): Promise<void> {
   console.log(JSON.stringify(workflow, null, 2));
 }
 
+async function workflowExecuteCartoon(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const prompt = options.positionals.join(" ");
+  const outputPath = optionValue(options, "output");
+  const dryRun = flagValue(options, "dry-run");
+
+  if (!prompt) {
+    throw new ValidationError("workflow:execute-cartoon requires a prompt");
+  }
+
+  if (!outputPath) {
+    throw new ValidationError("workflow:execute-cartoon requires --output PATH");
+  }
+
+  const execution = await executeCartoonWorkflow({
+    prompt,
+    outputPath,
+    format: optionalExportFormat(optionValue(options, "format")),
+    root: optionValue(options, "root"),
+    corpusPath: optionValue(options, "corpus"),
+    title: optionValue(options, "title"),
+    width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined,
+    launchPlatform: optionalLaunchPlatform(optionValue(options, "platform")),
+    appPath: optionValue(options, "app"),
+    dryRun,
+    waitForResults: dryRun ? false : !flagValue(options, "no-wait"),
+    timeoutMs: optionValue(options, "timeout-ms") ? Number(optionValue(options, "timeout-ms")) : undefined,
+    intervalMs: optionValue(options, "interval-ms") ? Number(optionValue(options, "interval-ms")) : undefined,
+    skipQa: flagValue(options, "skip-qa"),
+    minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
+    minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
+    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined
+  });
+
+  console.log(JSON.stringify(execution, null, 2));
+}
+
 interface ParsedOptions {
   positionals: string[];
   values: Map<string, string>;
   flags: Set<string>;
 }
 
-const flagOptions = new Set(["dry-run"]);
+const flagOptions = new Set(["dry-run", "no-wait", "skip-qa"]);
 
 function parseOptions(args: string[]): ParsedOptions {
   const positionals: string[] = [];
@@ -383,6 +425,7 @@ Commands:
   jsx:export --output PATH [--format pdf|svg|png|jpg] [--root DIR]
   plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--root DIR] [--corpus PATH]
   workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--root DIR] [--corpus PATH]
+  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH]
   job:status JOB_ID [--root DIR]
   job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
   job:launch JOB_ID [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--dry-run] [--root DIR]

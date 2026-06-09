@@ -6,6 +6,7 @@ import { LaunchJobError, launchJsxJob, type LaunchPlatform } from "./launcher.js
 import { JobResultError, normalizeJobId, readJobStatus } from "./results.js";
 import { normalizeCommand, ValidationError } from "./validation.js";
 import { ExportQaError, inspectExportArtifact } from "../qa/exportQa.js";
+import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
 
 export interface ServerOptions {
@@ -105,6 +106,32 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       root
     });
     writeJson(response, 201, workflow);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/cartoon/execute") {
+    const body = objectBody(await readJson(request));
+    const execution = await executeCartoonWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      format: optionalExportFormat(body.format),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      launchPlatform: optionalLaunchPlatform(body.platform),
+      appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      waitForResults: optionalBooleanBodyValue(body.waitForResults, "waitForResults"),
+      timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
+      intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
+      skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      root
+    });
+
+    writeJson(response, 201, execution);
     return;
   }
 

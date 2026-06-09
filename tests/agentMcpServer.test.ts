@@ -19,6 +19,7 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const listed = await client.listTools();
     assert.ok(listed.tools.some((tool) => tool.name === "semantic_search_visual_knowledge"));
     assert.ok(listed.tools.some((tool) => tool.name === "prepare_cartoon_publication_workflow"));
+    assert.ok(listed.tools.some((tool) => tool.name === "execute_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "plan_cartoon_scene_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_ping_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_cartoon_scene_job"));
@@ -95,6 +96,23 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const workflowBody = JSON.parse(workflowContent[0]?.text ?? "");
     assert.equal(workflowBody.ok, true);
     assert.equal(workflowBody.runbook.length, 4);
+
+    const executionResult = await client.callTool({
+      name: "execute_cartoon_publication_workflow",
+      arguments: {
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/mcp-execute.svg",
+        format: "svg",
+        root,
+        platform: "macos",
+        dryRun: true
+      }
+    });
+    const executionContent = executionResult.content as Array<{ type: string; text?: string }>;
+    const executionBody = JSON.parse(executionContent[0]?.text ?? "");
+    assert.equal(executionBody.ok, true);
+    assert.equal(executionBody.dryRun, true);
+    assert.equal(executionBody.sceneLaunch.dryRun, true);
 
     const svgPath = join(root, "figure.svg");
     await writeFile(svgPath, `<svg width="720" height="480"><rect width="720" height="480"/></svg>`, "utf8");

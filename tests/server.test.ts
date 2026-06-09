@@ -80,6 +80,39 @@ test("HTTP bridge prepares a cartoon workflow", async () => {
   }
 });
 
+test("HTTP bridge executes a cartoon workflow dry-run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-execute-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/cartoon/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/http-execute.svg",
+        format: "svg",
+        platform: "macos",
+        dryRun: true
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      sceneLaunch: { dryRun: boolean };
+      exportLaunch: { dryRun: boolean };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.sceneLaunch.dryRun, true);
+    assert.equal(body.exportLaunch.dryRun, true);
+  } finally {
+    await server.close();
+  }
+});
+
 test("HTTP bridge QA checks an exported SVG", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-qa-"));
   const server = await startBridgeServer({ port: 0, root });

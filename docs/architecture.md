@@ -46,6 +46,12 @@ Planned cartoon fallback:
 Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> launch/manual run -> wait result -> export JSX -> launch/manual run -> wait result -> export artifact QA -> visual inspection
 ```
 
+The executor path wraps that sequence for agents:
+
+```text
+execute_cartoon_publication_workflow / workflow:execute-cartoon -> prepare workflow -> launch scene -> wait scene -> launch export -> wait export -> artifact QA
+```
+
 ## Near-Term Milestones
 
 1. Prove native MCP discovery with `mcp:list-tools` on a machine running Illustrator Beta.
