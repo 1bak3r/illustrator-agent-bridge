@@ -1,9 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
+import { getGeneratedJobPaths } from "../bridge/files.js";
 import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
-import { readJobStatus, waitForJobResult } from "../bridge/results.js";
+import { launchJsxJob } from "../bridge/launcher.js";
+import { normalizeJobId, readJobStatus, waitForJobResult } from "../bridge/results.js";
 import { normalizeScene } from "../bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } from "../mcp/illustratorClient.js";
 import { planCartoonScene } from "../planner/cartoonPlanner.js";
@@ -15,6 +17,7 @@ const optionalRootSchema = z.string().min(1).optional();
 const optionalUrlSchema = z.string().url().optional();
 const optionalTokenSchema = z.string().min(1).optional();
 const exportFormatSchema = z.enum(["pdf", "svg", "png", "jpg"]);
+const launchPlatformSchema = z.enum(["auto", "macos", "windows", "wsl", "linux"]).optional();
 const semanticKindSchema = z
   .enum(["object_semantics", "style_reference", "publication_requirement", "document_state", "illustrator_capability"])
   .optional();
@@ -133,6 +136,27 @@ export function createAgentMcpServer(): McpServer {
         job: generatedJobSummary(job),
         run: runInstructions(job)
       });
+    }
+  );
+
+  server.registerTool(
+    "bridge_launch_job",
+    {
+      title: "Launch Illustrator JSX Job",
+      description:
+        "Ask the host OS to open a generated JSX job in Illustrator or the registered JSX file association, then wait for the job result.",
+      inputSchema: {
+        jobId: z.string().min(1),
+        platform: launchPlatformSchema,
+        appPath: z.string().min(1).max(1000).optional(),
+        dryRun: z.boolean().optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ jobId, platform, appPath, dryRun, root }) => {
+      const { jobPath } = await getGeneratedJobPaths(normalizeJobId(jobId), root);
+      const result = await launchJsxJob(jobPath, { platform, appPath, dryRun, root });
+      return jsonToolResult(result);
     }
   );
 
@@ -312,12 +336,14 @@ export function createAgentMcpServer(): McpServer {
                 "bridge_create_ping_job",
                 "bridge_create_cartoon_scene_job",
                 "bridge_create_export_job",
+                "bridge_launch_job",
                 "bridge_get_job_status",
                 "bridge_wait_for_job_result",
                 "qa_export_artifact"
               ],
               generatedJobContract: {
                 runInIllustrator: "File > Scripts > Other Script",
+                launchFromDesktop: "bridge_launch_job opens a generated JSX through the host OS when file association or app selection is configured.",
                 result: "Each generated JSX job writes a JSON result file.",
                 export: "Export jobs require an active Illustrator document.",
                 qa: "Run qa_export_artifact after an export job writes ok=true."

@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { startAgentMcpStdioServer } from "./agent/mcpServer.js";
+import { getGeneratedJobPaths } from "./bridge/files.js";
 import { createGeneratedJob } from "./bridge/jobs.js";
 import { generatedJobSummary } from "./bridge/jsxGenerator.js";
-import { JobResultError, readJobStatus, waitForJobResult } from "./bridge/results.js";
+import { LaunchJobError, launchJsxJob, type LaunchPlatform } from "./bridge/launcher.js";
+import { JobResultError, normalizeJobId, readJobStatus, waitForJobResult } from "./bridge/results.js";
 import { startBridgeServer } from "./bridge/server.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools, McpConfigError } from "./mcp/illustratorClient.js";
@@ -45,6 +47,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "job:wait":
       await jobWait(rest);
+      return;
+    case "job:launch":
+      await jobLaunch(rest);
       return;
     case "qa:export":
       await qaExport(rest);
@@ -189,6 +194,24 @@ async function jobWait(args: string[]): Promise<void> {
   console.log(JSON.stringify({ ok: true, job: status }, null, 2));
 }
 
+async function jobLaunch(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const id = options.positionals[0];
+
+  if (!id) {
+    throw new ValidationError("job:launch requires a job id");
+  }
+
+  const { jobPath } = await getGeneratedJobPaths(normalizeJobId(id), optionValue(options, "root"));
+  const result = await launchJsxJob(jobPath, {
+    platform: optionalLaunchPlatform(optionValue(options, "platform")),
+    appPath: optionValue(options, "app"),
+    dryRun: flagValue(options, "dry-run"),
+    root: optionValue(options, "root")
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
 async function qaExport(args: string[]): Promise<void> {
   const options = parseOptions(args);
   const path = options.positionals[0];
@@ -265,11 +288,15 @@ async function workflowCartoon(args: string[]): Promise<void> {
 interface ParsedOptions {
   positionals: string[];
   values: Map<string, string>;
+  flags: Set<string>;
 }
+
+const flagOptions = new Set(["dry-run"]);
 
 function parseOptions(args: string[]): ParsedOptions {
   const positionals: string[] = [];
   const values = new Map<string, string>();
+  const flags = new Set<string>();
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -287,6 +314,11 @@ function parseOptions(args: string[]): ParsedOptions {
     }
 
     if (next === undefined || next.startsWith("--")) {
+      if (flagOptions.has(key)) {
+        flags.add(key);
+        continue;
+      }
+
       throw new ValidationError(`Option --${key} requires a value`);
     }
 
@@ -294,11 +326,29 @@ function parseOptions(args: string[]): ParsedOptions {
     index += 1;
   }
 
-  return { positionals, values };
+  return { positionals, values, flags };
 }
 
 function optionValue(options: ParsedOptions, key: string): string | undefined {
   return options.values.get(key);
+}
+
+function flagValue(options: ParsedOptions, key: string): boolean {
+  const value = options.values.get(key);
+  if (value !== undefined) {
+    const normalized = value.toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes") {
+      return true;
+    }
+
+    if (normalized === "false" || normalized === "0" || normalized === "no") {
+      return false;
+    }
+
+    throw new ValidationError(`Option --${key} must be true or false`);
+  }
+
+  return options.flags.has(key);
 }
 
 async function readJsonArg(value: string): Promise<unknown> {
@@ -335,6 +385,7 @@ Commands:
   workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--root DIR] [--corpus PATH]
   job:status JOB_ID [--root DIR]
   job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
+  job:launch JOB_ID [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--dry-run] [--root DIR]
   qa:export PATH [--format pdf|svg|png|jpg] [--min-bytes N] [--min-width N] [--min-height N]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
   semantic:search QUERY [--limit N] [--corpus PATH]
@@ -349,7 +400,11 @@ Environment:
 
 main(process.argv.slice(2)).catch((error) => {
   const expected =
-    error instanceof ValidationError || error instanceof McpConfigError || error instanceof JobResultError || error instanceof ExportQaError;
+    error instanceof ValidationError ||
+    error instanceof McpConfigError ||
+    error instanceof JobResultError ||
+    error instanceof ExportQaError ||
+    error instanceof LaunchJobError;
   console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
   process.exitCode = expected ? 2 : 1;
 });
@@ -362,6 +417,19 @@ function optionalExportFormat(input: string | undefined): "pdf" | "svg" | "png" 
   const value = input.toLowerCase();
   if (value !== "pdf" && value !== "svg" && value !== "png" && value !== "jpg") {
     throw new ValidationError("format must be pdf, svg, png, or jpg");
+  }
+
+  return value;
+}
+
+function optionalLaunchPlatform(input: string | undefined): LaunchPlatform | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = input.toLowerCase();
+  if (value !== "auto" && value !== "macos" && value !== "windows" && value !== "wsl" && value !== "linux") {
+    throw new ValidationError("platform must be auto, macos, windows, wsl, or linux");
   }
 
   return value;

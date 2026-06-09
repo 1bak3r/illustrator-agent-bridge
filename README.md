@@ -20,6 +20,12 @@ npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/ex
 ```
 
 The `jsx:*` commands write jobs under `var/jobs/` and expected results under `var/results/`. In Illustrator, run a generated job with `File > Scripts > Other Script`, then inspect the matching result JSON.
+When the host OS has a JSX file association, or when you pass an Illustrator app name/path, the bridge can ask the desktop to open the job:
+
+```bash
+node dist/src/cli.js job:launch <job-id> --dry-run --platform macos --app "Adobe Illustrator"
+node dist/src/cli.js job:launch <job-id> --platform macos --app "Adobe Illustrator"
+```
 
 After a document exists in Illustrator, generate an export job:
 
@@ -64,6 +70,7 @@ That server exposes tools to create Illustrator JSX jobs and to proxy Illustrato
 It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
 Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
+Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
 Use `qa_export_artifact` after export to check basic file size, format signature, dimensions, and SVG/PDF structure.
 
 Create a job over HTTP:
@@ -72,6 +79,14 @@ Create a job over HTTP:
 curl -sS http://127.0.0.1:4317/v1/jobs \
   -H 'content-type: application/json' \
   -d '{"kind":"ping","message":"hello Illustrator"}'
+```
+
+Launch a generated job over HTTP:
+
+```bash
+curl -sS http://127.0.0.1:4317/v1/jobs/<job-id>/launch \
+  -H 'content-type: application/json' \
+  -d '{"dryRun":true,"platform":"macos","appPath":"Adobe Illustrator"}'
 ```
 
 ## Why This Shape

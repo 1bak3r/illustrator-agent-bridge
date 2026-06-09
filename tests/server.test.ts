@@ -22,13 +22,24 @@ test("HTTP bridge creates a JSX job", async () => {
     assert.equal(response.status, 201);
     const body = (await response.json()) as {
       ok: boolean;
-      job: { jobPath: string; resultPath: string };
+      job: { id: string; jobPath: string; resultPath: string };
     };
     assert.equal(body.ok, true);
     await access(body.job.jobPath);
     assert.match(body.job.resultPath, /results\/.+\.json$/);
 
-    const status = await fetch(`${server.url}/v1/jobs/${body.job.jobPath.match(/([0-9a-f-]{36})\.jsx$/)?.[1]}/status`);
+    const launch = await fetch(`${server.url}/v1/jobs/${body.job.id}/launch`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dryRun: true, platform: "macos", appPath: "Adobe Illustrator" })
+    });
+    assert.equal(launch.status, 200);
+    const launchBody = (await launch.json()) as { ok: boolean; dryRun: boolean; command: { command: string } };
+    assert.equal(launchBody.ok, true);
+    assert.equal(launchBody.dryRun, true);
+    assert.equal(launchBody.command.command, "open");
+
+    const status = await fetch(`${server.url}/v1/jobs/${body.job.id}/status`);
     assert.equal(status.status, 200);
     const statusBody = (await status.json()) as { ok: boolean; job: { exists: boolean } };
     assert.equal(statusBody.ok, true);

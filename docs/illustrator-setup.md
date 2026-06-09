@@ -36,8 +36,14 @@ npm run jsx:ping
 ```
 
 2. Open Illustrator.
-3. Select `File > Scripts > Other Script`.
-4. Pick the generated `.jsx` path printed by the CLI.
+3. Select `File > Scripts > Other Script`, then pick the generated `.jsx` path printed by the CLI.
+4. Alternatively, ask the desktop to open the job:
+
+```bash
+node dist/src/cli.js job:launch <job-id> --dry-run --platform auto
+node dist/src/cli.js job:launch <job-id> --platform auto
+```
+
 5. Check the matching `var/results/<job-id>.json`.
 
 Adobe shows an external JSX warning for scripts launched outside the installed scripts folder. Leave it enabled while developing unless you have a controlled local workflow.
@@ -86,14 +92,24 @@ npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/ex
 
 The workflow returns two generated JSX jobs:
 
-1. Run the scene job in Illustrator.
+1. Launch or manually run the scene job in Illustrator:
+
+```bash
+node dist/src/cli.js job:launch <scene-job-id> --platform auto
+```
+
 2. Wait for its result:
 
 ```bash
 node dist/src/cli.js job:wait <scene-job-id> --timeout-ms 60000
 ```
 
-3. Run the export job in Illustrator.
+3. Launch or manually run the export job in Illustrator:
+
+```bash
+node dist/src/cli.js job:launch <export-job-id> --platform auto
+```
+
 4. Wait for its result:
 
 ```bash
@@ -119,6 +135,7 @@ An MCP client can then call:
 - `bridge_create_ping_job`
 - `bridge_create_cartoon_scene_job`
 - `bridge_create_export_job`
+- `bridge_launch_job`
 - `plan_cartoon_scene_job`
 - `prepare_cartoon_publication_workflow`
 - `bridge_get_job_status`

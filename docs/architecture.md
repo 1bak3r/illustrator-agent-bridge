@@ -15,7 +15,7 @@
    Uses Illustrator Beta's MCP server when available. This is the preferred control plane for direct document operations exposed by Adobe.
 
 5. ExtendScript job connector
-   Emits self-contained `.jsx` scripts for regular Illustrator. Jobs write JSON results so the caller can confirm execution.
+   Emits self-contained `.jsx` scripts for regular Illustrator, asks the desktop to open them when configured, and reads JSON results so the caller can confirm execution.
 
 6. Semantic search layer
    Planned retrieval layer for visual references, object semantics, style guides, and publication constraints. Retrieval should feed the planning step before commands are sent to Illustrator.
@@ -31,7 +31,7 @@ LLM -> bridge CLI/MCP client -> Illustrator Beta MCP server -> active Illustrato
 ExtendScript fallback:
 
 ```text
-LLM -> bridge HTTP/CLI -> validated command -> generated .jsx -> Illustrator -> result JSON
+LLM -> bridge HTTP/CLI/MCP -> validated command -> generated .jsx -> desktop launch or manual run -> Illustrator -> result JSON
 ```
 
 Agent-facing MCP:
@@ -43,7 +43,7 @@ LLM MCP client -> illustrator-agent-bridge stdio MCP -> generated JSX or Illustr
 Planned cartoon fallback:
 
 ```text
-Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> wait result -> export JSX -> wait result -> export artifact QA -> visual inspection
+Prompt -> semantic search -> deterministic scene planner -> static QA -> generated scene JSX -> launch/manual run -> wait result -> export JSX -> launch/manual run -> wait result -> export artifact QA -> visual inspection
 ```
 
 ## Near-Term Milestones

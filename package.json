@@ -18,6 +18,7 @@
     "jsx:export": "node dist/src/cli.js jsx:export",
     "plan:cartoon": "node dist/src/cli.js plan:cartoon",
     "workflow:cartoon": "node dist/src/cli.js workflow:cartoon",
+    "job:launch": "node dist/src/cli.js job:launch",
     "semantic:search": "node dist/src/cli.js semantic:search"
   },
   "dependencies": {

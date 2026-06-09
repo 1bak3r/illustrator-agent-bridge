@@ -23,6 +23,7 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_ping_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_cartoon_scene_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_create_export_job"));
+    assert.ok(listed.tools.some((tool) => tool.name === "bridge_launch_job"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_get_job_status"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_wait_for_job_result"));
     assert.ok(listed.tools.some((tool) => tool.name === "qa_export_artifact"));
@@ -53,6 +54,21 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const body = JSON.parse(content[0]?.text ?? "");
     assert.equal(body.ok, true);
     assert.match(body.job.jobPath, /jobs\/.+\.jsx$/);
+
+    const launchResult = await client.callTool({
+      name: "bridge_launch_job",
+      arguments: {
+        jobId: body.job.id,
+        root,
+        platform: "macos",
+        dryRun: true
+      }
+    });
+    const launchContent = launchResult.content as Array<{ type: string; text?: string }>;
+    const launchBody = JSON.parse(launchContent[0]?.text ?? "");
+    assert.equal(launchBody.ok, true);
+    assert.equal(launchBody.dryRun, true);
+    assert.equal(launchBody.command.command, "open");
 
     const planResult = await client.callTool({
       name: "plan_cartoon_scene_job",

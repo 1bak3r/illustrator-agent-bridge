@@ -66,7 +66,7 @@ function buildRunbook(sceneJob: GeneratedJob, exportJob: GeneratedJob, format: E
   return [
     {
       step: 1,
-      action: "Run scene JSX in Illustrator using File > Scripts > Other Script.",
+      action: "Launch scene JSX with job:launch or bridge_launch_job, or run it manually in Illustrator using File > Scripts > Other Script.",
       jobId: sceneJob.id,
       scriptPath: sceneJob.illustratorJobPath,
       resultPath: sceneJob.resultPath,
@@ -81,7 +81,7 @@ function buildRunbook(sceneJob: GeneratedJob, exportJob: GeneratedJob, format: E
     },
     {
       step: 3,
-      action: `Run export JSX in Illustrator to export the active document as ${format.toUpperCase()}.`,
+      action: `Launch export JSX with job:launch or bridge_launch_job to export the active document as ${format.toUpperCase()}, or run it manually in Illustrator.`,
       jobId: exportJob.id,
       scriptPath: exportJob.illustratorJobPath,
       resultPath: exportJob.resultPath,
