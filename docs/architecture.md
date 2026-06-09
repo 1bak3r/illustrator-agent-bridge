@@ -57,5 +57,5 @@ execute_cartoon_publication_workflow / workflow:execute-cartoon -> prepare workf
 1. Prove native MCP discovery with `mcp:list-tools` on a machine running Illustrator Beta.
 2. Add a small vocabulary of high-level vector commands: create document, create named layer, draw styled shapes, edit text, export PDF/SVG/PNG.
 3. Add semantic retrieval for "what is this object/style?" before generating scene plans.
-4. Add visual QA: export a PNG, inspect dimensions/nonblank pixels, and iterate before declaring artwork done.
+4. Add visual QA: export a PNG, inspect dimensions/nonblank pixels, and iterate before declaring artwork done. The bridge now performs PNG nonblank pixel checks; iteration is the next layer.
 5. Replace the deterministic planner with an LLM planner that still emits the same validated scene contract.

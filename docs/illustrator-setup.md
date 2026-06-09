@@ -125,7 +125,7 @@ node dist/src/cli.js job:wait <export-job-id> --timeout-ms 60000
 5. Run export artifact QA:
 
 ```bash
-node dist/src/cli.js qa:export ./var/exports/figure.pdf --format pdf --min-bytes 1000
+node dist/src/cli.js qa:export ./var/exports/figure.png --format png --min-bytes 1000 --min-nonblank-ratio 0.001
 ```
 
 ## Agent-Facing MCP Server

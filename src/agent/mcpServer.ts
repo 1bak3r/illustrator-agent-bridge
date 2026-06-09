@@ -65,17 +65,18 @@ export function createAgentMcpServer(): McpServer {
     {
       title: "QA Exported Illustrator Artifact",
       description:
-        "Inspect an exported Illustrator artifact for basic publication workflow gates: file size, format signature, dimensions when available, and SVG/PDF structure.",
+        "Inspect an exported Illustrator artifact for publication workflow gates: file size, format signature, dimensions, SVG/PDF structure, and PNG nonblank pixels.",
       inputSchema: {
         path: z.string().min(1).max(1000),
         format: exportFormatSchema.optional(),
         minBytes: z.number().int().min(0).optional(),
         minWidth: z.number().int().min(1).optional(),
-        minHeight: z.number().int().min(1).optional()
+        minHeight: z.number().int().min(1).optional(),
+        minNonBlankRatio: z.number().min(0).max(1).optional()
       }
     },
-    async ({ path, format, minBytes, minWidth, minHeight }) => {
-      const report = await inspectExportArtifact(path, { format, minBytes, minWidth, minHeight });
+    async ({ path, format, minBytes, minWidth, minHeight, minNonBlankRatio }) => {
+      const report = await inspectExportArtifact(path, { format, minBytes, minWidth, minHeight, minNonBlankRatio });
       return jsonToolResult({
         ok: report.ok,
         report
@@ -136,6 +137,7 @@ export function createAgentMcpServer(): McpServer {
         minBytes: z.number().int().min(0).optional(),
         minWidth: z.number().int().min(1).optional(),
         minHeight: z.number().int().min(1).optional(),
+        minNonBlankRatio: z.number().min(0).max(1).optional(),
         root: optionalRootSchema
       }
     },
@@ -156,6 +158,7 @@ export function createAgentMcpServer(): McpServer {
       minBytes,
       minWidth,
       minHeight,
+      minNonBlankRatio,
       root
     }) => {
       const execution = await executeCartoonWorkflow({
@@ -175,6 +178,7 @@ export function createAgentMcpServer(): McpServer {
         minBytes,
         minWidth,
         minHeight,
+        minNonBlankRatio,
         root
       });
       return jsonToolResult(execution);
@@ -416,7 +420,7 @@ export function createAgentMcpServer(): McpServer {
                 launchFromDesktop: "bridge_launch_job opens a generated JSX through the host OS when file association or app selection is configured.",
                 result: "Each generated JSX job writes a JSON result file.",
                 export: "Export jobs require an active Illustrator document.",
-                qa: "Run qa_export_artifact after an export job writes ok=true."
+                qa: "Run qa_export_artifact after an export job writes ok=true; PNG exports include nonblank pixel analysis."
               }
             },
             null,

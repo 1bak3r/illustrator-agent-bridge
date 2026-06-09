@@ -41,10 +41,10 @@ node dist/src/cli.js job:status <job-id>
 node dist/src/cli.js job:wait <job-id> --timeout-ms 60000
 ```
 
-Run structural QA on the exported file:
+Run structural and PNG visual QA on the exported file:
 
 ```bash
-node dist/src/cli.js qa:export ./var/exports/figure.svg --min-width 360 --min-height 240
+node dist/src/cli.js qa:export ./var/exports/figure.png --format png --min-width 360 --min-height 240 --min-nonblank-ratio 0.001
 ```
 
 For the native MCP path, copy the server URL and key from Illustrator Beta `MCP & Tools`, then:
@@ -73,7 +73,7 @@ Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt 
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
 Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.
 Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
-Use `qa_export_artifact` after export to check basic file size, format signature, dimensions, and SVG/PDF structure.
+Use `qa_export_artifact` after export to check file size, format signature, dimensions, SVG/PDF structure, and PNG nonblank pixel content.
 
 Create a job over HTTP:
 

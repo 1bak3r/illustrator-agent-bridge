@@ -10,7 +10,7 @@ The first orchestrated fallback is `workflow:cartoon` / `prepare_cartoon_publica
 
 The executable fallback is `workflow:execute-cartoon` / `execute_cartoon_publication_workflow`. It uses the same retrieval and planner contract, then performs launch, wait, export, and artifact QA steps. Agents should call it with dry-run enabled before attempting a live Illustrator launch.
 
-After export, `qa:export` / `qa_export_artifact` runs structural artifact QA. It does not replace human/LLM visual inspection, but it catches missing files, wrong formats, tiny exports, missing SVG vector elements, and missing PDF page structure before the agent proceeds.
+After export, `qa:export` / `qa_export_artifact` runs artifact QA. It does not replace human/LLM visual inspection, but it catches missing files, wrong formats, tiny exports, missing SVG vector elements, missing PDF page structure, and blank PNG exports before the agent proceeds.
 
 ## Retrieval Targets
 

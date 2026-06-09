@@ -16,6 +16,7 @@ export interface ExecuteCartoonWorkflowOptions extends PrepareCartoonWorkflowOpt
   minBytes?: number;
   minWidth?: number;
   minHeight?: number;
+  minNonBlankRatio?: number;
 }
 
 export interface CartoonWorkflowExecution {
@@ -116,7 +117,8 @@ export async function executeCartoonWorkflow(options: ExecuteCartoonWorkflowOpti
           format: workflowExportFormat(options.format),
           minBytes: options.minBytes,
           minWidth: options.minWidth,
-          minHeight: options.minHeight
+          minHeight: options.minHeight,
+          minNonBlankRatio: options.minNonBlankRatio
         })
       : undefined;
 

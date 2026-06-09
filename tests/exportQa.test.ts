@@ -4,6 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { inspectExportArtifact } from "../src/qa/exportQa.js";
+import { makeRgbaPng } from "./pngFixture.js";
 
 test("inspectExportArtifact passes a structured SVG export", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-qa-svg-"));
@@ -35,4 +36,34 @@ test("inspectExportArtifact reads PNG dimensions from IHDR", async () => {
   const report = await inspectExportArtifact(path, { minBytes: 1 });
   assert.equal(report.format, "png");
   assert.deepEqual(report.dimensions, { width: 640, height: 360 });
+});
+
+test("inspectExportArtifact checks PNG nonblank pixels and content bounds", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-qa-png-content-"));
+  const path = join(root, "figure.png");
+  await writeFile(
+    path,
+    makeRgbaPng(20, 20, (x, y) => (x >= 6 && x < 14 && y >= 6 && y < 14 ? [0, 0, 0, 255] : [255, 255, 255, 255]))
+  );
+
+  const report = await inspectExportArtifact(path, { minBytes: 1, minWidth: 1, minHeight: 1, minNonBlankRatio: 0.01 });
+  assert.equal(report.ok, true);
+  assert.equal(report.format, "png");
+  assert.equal(report.checks.some((check) => check.id === "png-nonblank-pixels" && check.status === "pass"), true);
+  assert.deepEqual((report.details?.pixelAnalysis as { contentBounds?: unknown }).contentBounds, {
+    x: 6,
+    y: 6,
+    width: 8,
+    height: 8
+  });
+});
+
+test("inspectExportArtifact fails blank PNG exports", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-qa-png-blank-"));
+  const path = join(root, "blank.png");
+  await writeFile(path, makeRgbaPng(20, 20, () => [255, 255, 255, 255]));
+
+  const report = await inspectExportArtifact(path, { minBytes: 1, minWidth: 1, minHeight: 1 });
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.some((check) => check.id === "png-nonblank-pixels" && check.status === "fail"), true);
 });

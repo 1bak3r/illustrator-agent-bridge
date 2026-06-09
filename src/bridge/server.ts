@@ -128,6 +128,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
       minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
       minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio"),
       root
     });
 
@@ -141,7 +142,8 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       format: optionalExportFormat(body.format),
       minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
       minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
-      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight")
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio")
     });
     writeJson(response, 200, { ok: report.ok, report });
     return;

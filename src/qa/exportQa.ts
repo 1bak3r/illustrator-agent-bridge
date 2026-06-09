@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
+import { analyzePngPixels, PngDecodeError } from "./pngPixels.js";
 
 export type ExportFormat = "pdf" | "svg" | "png" | "jpg";
 
@@ -8,6 +9,7 @@ export interface ExportQaOptions {
   minBytes?: number;
   minWidth?: number;
   minHeight?: number;
+  minNonBlankRatio?: number;
 }
 
 export interface ExportQaReport {
@@ -83,6 +85,10 @@ export async function inspectExportArtifact(path: string, options: ExportQaOptio
     checks.push(pageCount > 0 ? pass("pdf-pages", `PDF appears to contain ${pageCount} page object(s).`) : warn("pdf-pages", "Could not count PDF pages."));
   }
 
+  if (format === "png") {
+    addPngPixelChecks(buffer, checks, details, options);
+  }
+
   return {
     ok: checks.every((check) => check.status !== "fail"),
     path,
@@ -92,6 +98,43 @@ export async function inspectExportArtifact(path: string, options: ExportQaOptio
     checks,
     details
   };
+}
+
+function addPngPixelChecks(buffer: Buffer, checks: ExportQaCheck[], details: Record<string, unknown>, options: ExportQaOptions): void {
+  const minNonBlankRatio = options.minNonBlankRatio ?? 0.001;
+  if (!Number.isFinite(minNonBlankRatio) || minNonBlankRatio < 0 || minNonBlankRatio > 1) {
+    throw new ExportQaError("minNonBlankRatio must be between 0 and 1");
+  }
+
+  try {
+    const analysis = analyzePngPixels(buffer);
+    details.pixelAnalysis = analysis;
+
+    checks.push(
+      analysis.nonBackgroundRatio >= minNonBlankRatio
+        ? pass("png-nonblank-pixels", `PNG non-background content covers ${(analysis.nonBackgroundRatio * 100).toFixed(2)}% of pixels.`)
+        : fail(
+            "png-nonblank-pixels",
+            `PNG appears blank: non-background content covers ${(analysis.nonBackgroundRatio * 100).toFixed(2)}% of pixels; expected at least ${(
+              minNonBlankRatio * 100
+            ).toFixed(2)}%.`
+          )
+    );
+
+    if (analysis.contentBounds) {
+      checks.push(
+        analysis.touchesCanvasEdge
+          ? warn("png-content-framing", "PNG content touches a canvas edge; inspect exported framing before publication use.")
+          : pass("png-content-framing", "PNG content is inset from the canvas edge.")
+      );
+    }
+  } catch (error) {
+    checks.push(
+      error instanceof PngDecodeError
+        ? warn("png-pixel-analysis", `Could not inspect PNG pixels: ${error.message}.`)
+        : warn("png-pixel-analysis", `Could not inspect PNG pixels: ${error instanceof Error ? error.message : String(error)}.`)
+    );
+  }
 }
 
 function detectFormat(path: string, buffer: Buffer): ExportFormat | "unknown" {

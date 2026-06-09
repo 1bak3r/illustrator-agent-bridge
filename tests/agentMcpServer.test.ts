@@ -120,7 +120,8 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
       name: "qa_export_artifact",
       arguments: {
         path: svgPath,
-        minBytes: 1
+        minBytes: 1,
+        minNonBlankRatio: 0.001
       }
     });
     const qaContent = qaResult.content as Array<{ type: string; text?: string }>;

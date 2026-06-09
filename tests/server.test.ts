@@ -4,6 +4,7 @@ import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startBridgeServer } from "../src/bridge/server.js";
+import { makeRgbaPng } from "./pngFixture.js";
 
 test("HTTP bridge creates a JSX job", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-"));
@@ -131,6 +132,32 @@ test("HTTP bridge QA checks an exported SVG", async () => {
     const body = (await response.json()) as { ok: boolean; report: { format: string } };
     assert.equal(body.ok, true);
     assert.equal(body.report.format, "svg");
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge QA checks PNG nonblank pixels", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-qa-png-"));
+  const server = await startBridgeServer({ port: 0, root });
+  const pngPath = join(root, "exports", "figure.png");
+
+  try {
+    await mkdir(join(root, "exports"), { recursive: true });
+    await writeFile(
+      pngPath,
+      makeRgbaPng(16, 16, (x, y) => (x >= 4 && x < 12 && y >= 4 && y < 12 ? [24, 24, 24, 255] : [255, 255, 255, 255]))
+    );
+    const response = await fetch(`${server.url}/v1/qa/export`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: pngPath, format: "png", minBytes: 1, minWidth: 1, minHeight: 1, minNonBlankRatio: 0.01 })
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { ok: boolean; report: { details?: { pixelAnalysis?: unknown } } };
+    assert.equal(body.ok, true);
+    assert.notEqual(body.report.details?.pixelAnalysis, undefined);
   } finally {
     await server.close();
   }

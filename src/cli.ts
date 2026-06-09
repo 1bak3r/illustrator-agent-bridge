@@ -228,7 +228,8 @@ async function qaExport(args: string[]): Promise<void> {
     format: optionalExportFormat(optionValue(options, "format")),
     minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
     minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
-    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined
+    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
+    minNonBlankRatio: optionValue(options, "min-nonblank-ratio") ? Number(optionValue(options, "min-nonblank-ratio")) : undefined
   });
   console.log(JSON.stringify({ ok: report.ok, report }, null, 2));
 }
@@ -321,7 +322,8 @@ async function workflowExecuteCartoon(args: string[]): Promise<void> {
     skipQa: flagValue(options, "skip-qa"),
     minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
     minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
-    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined
+    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
+    minNonBlankRatio: optionValue(options, "min-nonblank-ratio") ? Number(optionValue(options, "min-nonblank-ratio")) : undefined
   });
 
   console.log(JSON.stringify(execution, null, 2));
@@ -425,11 +427,11 @@ Commands:
   jsx:export --output PATH [--format pdf|svg|png|jpg] [--root DIR]
   plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--root DIR] [--corpus PATH]
   workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--root DIR] [--corpus PATH]
-  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH]
+  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   job:status JOB_ID [--root DIR]
   job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
   job:launch JOB_ID [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--dry-run] [--root DIR]
-  qa:export PATH [--format pdf|svg|png|jpg] [--min-bytes N] [--min-width N] [--min-height N]
+  qa:export PATH [--format pdf|svg|png|jpg] [--min-bytes N] [--min-width N] [--min-height N] [--min-nonblank-ratio N]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
   semantic:search QUERY [--limit N] [--corpus PATH]
 
