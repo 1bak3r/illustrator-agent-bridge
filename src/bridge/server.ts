@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { dashboardHtml } from "./dashboard.js";
 import { createGeneratedJob } from "./jobs.js";
 import { getGeneratedJobPaths, resolveBridgeRoot } from "./files.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
@@ -57,6 +58,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
 
   if (method === "GET" && url.pathname === "/health") {
     writeJson(response, 200, { ok: true, root });
+    return;
+  }
+
+  if (method === "GET" && (url.pathname === "/" || url.pathname === "/dashboard")) {
+    writeHtml(response, 200, dashboardHtml());
     return;
   }
 
@@ -233,6 +239,11 @@ function statusForError(error: unknown): number {
 function writeJson(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(`${JSON.stringify(body, null, 2)}\n`);
+}
+
+function writeHtml(response: ServerResponse, status: number, body: string): void {
+  response.writeHead(status, { "content-type": "text/html; charset=utf-8" });
+  response.end(body);
 }
 
 function objectBody(input: unknown): Record<string, unknown> {

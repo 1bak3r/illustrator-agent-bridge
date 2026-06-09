@@ -8,16 +8,19 @@
 2. Bridge process
    Validates input, avoids arbitrary code injection, and routes to one of two Illustrator connectors.
 
-3. Agent-facing MCP server
+3. Browser dashboard
+   Serves a local control surface at `/dashboard` for prompt-to-workflow execution, job status checks, and export QA through the same HTTP API.
+
+4. Agent-facing MCP server
    Exposes this bridge as stdio MCP tools so an LLM client can create JSX jobs or proxy native Illustrator Beta MCP calls.
 
-4. Native MCP connector
+5. Native MCP connector
    Uses Illustrator Beta's MCP server when available. This is the preferred control plane for direct document operations exposed by Adobe.
 
-5. ExtendScript job connector
+6. ExtendScript job connector
    Emits self-contained `.jsx` scripts for regular Illustrator, asks the desktop to open them when configured, and reads JSON results so the caller can confirm execution.
 
-6. Semantic search layer
+7. Semantic search layer
    Planned retrieval layer for visual references, object semantics, style guides, and publication constraints. Retrieval should feed the planning step before commands are sent to Illustrator.
 
 ## Command Flow
@@ -38,6 +41,12 @@ Agent-facing MCP:
 
 ```text
 LLM MCP client -> illustrator-agent-bridge stdio MCP -> generated JSX or Illustrator Beta MCP
+```
+
+Browser dashboard:
+
+```text
+Browser agent -> local dashboard -> bridge HTTP API -> workflow execution or job status
 ```
 
 Planned cartoon fallback:

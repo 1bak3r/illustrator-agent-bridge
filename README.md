@@ -61,6 +61,8 @@ Start the local HTTP job bridge for an LLM/browser agent:
 npm start
 ```
 
+Then open `http://127.0.0.1:4317/dashboard` for the local browser control surface.
+
 Expose the bridge itself as an MCP server over stdio:
 
 ```bash

@@ -50,6 +50,23 @@ test("HTTP bridge creates a JSX job", async () => {
   }
 });
 
+test("HTTP bridge serves the browser dashboard", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-dashboard-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/dashboard`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /text\/html/);
+    const html = await response.text();
+    assert.match(html, /Illustrator Agent Bridge/);
+    assert.match(html, /\/v1\/workflows\/cartoon\/execute/);
+    assert.match(html, /minNonBlankRatio/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("HTTP bridge prepares a cartoon workflow", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-workflow-"));
   const server = await startBridgeServer({ port: 0, root });

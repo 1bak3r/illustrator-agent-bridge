@@ -56,6 +56,12 @@ Start:
 npm start
 ```
 
+Open the browser dashboard:
+
+```text
+http://127.0.0.1:4317/dashboard
+```
+
 Create a ping job:
 
 ```bash
