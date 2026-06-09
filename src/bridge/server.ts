@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { dashboardHtml } from "./dashboard.js";
 import { createGeneratedJob } from "./jobs.js";
 import { getGeneratedJobPaths, resolveBridgeRoot } from "./files.js";
+import { detectIllustratorApps, probeIllustratorCommunication, type IllustratorProbeMethod } from "./illustratorProbe.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
 import { LaunchJobError, launchJsxJob, type LaunchPlatform } from "./launcher.js";
 import { JobResultError, normalizeJobId, readJobStatus } from "./results.js";
@@ -65,6 +66,32 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
 
   if (method === "GET" && (url.pathname === "/" || url.pathname === "/dashboard")) {
     writeHtml(response, 200, dashboardHtml());
+    return;
+  }
+
+  if (method === "GET" && url.pathname === "/v1/illustrator/detect") {
+    const platform = optionalLaunchPlatform(url.searchParams.get("platform") ?? undefined);
+    const candidates = await detectIllustratorApps(platform);
+    writeJson(response, 200, { ok: true, platform: platform ?? "auto", candidates });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/illustrator/probe") {
+    const body = objectBody(await readOptionalJson(request));
+    const result = await probeIllustratorCommunication({
+      platform: optionalLaunchPlatform(body.platform),
+      method: optionalProbeMethod(body.method),
+      appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      waitForResult: optionalBooleanBodyValue(body.waitForResult, "waitForResult"),
+      autoConfirmDialog: optionalBooleanBodyValue(body.autoConfirmDialog, "autoConfirmDialog"),
+      drawCircle: optionalBooleanBodyValue(body.drawCircle, "drawCircle"),
+      timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
+      dialogTimeoutMs: optionalNumberBodyValue(body.dialogTimeoutMs, "dialogTimeoutMs"),
+      intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
+      root
+    });
+    writeJson(response, 201, result);
     return;
   }
 
@@ -340,6 +367,19 @@ function optionalPlannerMode(input: unknown): PlannerMode | undefined {
   const value = stringBodyValue(input, "planner").toLowerCase();
   if (value !== "deterministic" && value !== "auto" && value !== "openai") {
     throw new ValidationError("planner must be deterministic, auto, or openai");
+  }
+
+  return value;
+}
+
+function optionalProbeMethod(input: unknown): IllustratorProbeMethod | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "method").toLowerCase();
+  if (value !== "auto" && value !== "desktop" && value !== "com") {
+    throw new ValidationError("method must be auto, desktop, or com");
   }
 
   return value;

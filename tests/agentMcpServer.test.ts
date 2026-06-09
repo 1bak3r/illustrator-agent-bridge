@@ -18,6 +18,8 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
   try {
     const listed = await client.listTools();
     assert.ok(listed.tools.some((tool) => tool.name === "semantic_search_visual_knowledge"));
+    assert.ok(listed.tools.some((tool) => tool.name === "detect_illustrator_desktop"));
+    assert.ok(listed.tools.some((tool) => tool.name === "probe_illustrator_communication"));
     assert.ok(listed.tools.some((tool) => tool.name === "prepare_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "execute_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "plan_cartoon_scene_job"));
@@ -40,6 +42,20 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const searchBody = JSON.parse(searchContent[0]?.text ?? "");
     assert.equal(searchBody.ok, true);
     assert.equal(searchBody.results[0].item.kind, "object_semantics");
+
+    const probeResult = await client.callTool({
+      name: "probe_illustrator_communication",
+      arguments: {
+        root,
+        platform: "macos",
+        appPath: "Adobe Illustrator",
+        dryRun: true
+      }
+    });
+    const probeContent = probeResult.content as Array<{ type: string; text?: string }>;
+    const probeBody = JSON.parse(probeContent[0]?.text ?? "");
+    assert.equal(probeBody.ok, true);
+    assert.equal(probeBody.launch.dryRun, true);
 
     const result = await client.callTool({
       name: "bridge_create_ping_job",

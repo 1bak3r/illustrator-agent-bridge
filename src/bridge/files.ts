@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
+export type IllustratorHostPlatform = "auto" | "macos" | "windows" | "wsl" | "linux";
+
 export interface BridgeDirs {
   root: string;
   jobs: string;
@@ -36,13 +38,33 @@ export async function writeGeneratedJob(jobPath: string, jsx: string): Promise<v
   await writeFile(jobPath, jsx, "utf8");
 }
 
-export function toIllustratorPath(localPath: string, hostPlatform = process.env.ILLUSTRATOR_HOST_PLATFORM ?? "auto"): string {
+export function toIllustratorPath(localPath: string, hostPlatform: IllustratorHostPlatform = configuredHostPlatform()): string {
   const normalized = localPath.replace(/\\/g, "/");
   const windowsMount = normalized.match(/^\/mnt\/([a-zA-Z])\/(.*)$/);
 
-  if ((hostPlatform === "auto" || hostPlatform === "windows") && windowsMount) {
+  if ((hostPlatform === "auto" || hostPlatform === "windows" || hostPlatform === "wsl") && windowsMount) {
     return `${windowsMount[1].toUpperCase()}:/${windowsMount[2]}`;
   }
 
+  if ((hostPlatform === "wsl" || (hostPlatform === "auto" && isWsl())) && normalized.startsWith("/")) {
+    const distro = process.env.WSL_DISTRO_NAME;
+    if (distro) {
+      return `//wsl.localhost/${distro}${normalized}`;
+    }
+  }
+
   return normalized;
+}
+
+function configuredHostPlatform(): IllustratorHostPlatform {
+  const value = process.env.ILLUSTRATOR_HOST_PLATFORM;
+  if (value === "macos" || value === "windows" || value === "wsl" || value === "linux") {
+    return value;
+  }
+
+  return "auto";
+}
+
+function isWsl(): boolean {
+  return Boolean(process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP);
 }

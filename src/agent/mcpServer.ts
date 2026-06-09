@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
 import { getGeneratedJobPaths } from "../bridge/files.js";
+import { detectIllustratorApps, probeIllustratorCommunication } from "../bridge/illustratorProbe.js";
 import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
 import { launchJsxJob } from "../bridge/launcher.js";
@@ -19,6 +20,7 @@ const optionalUrlSchema = z.string().url().optional();
 const optionalTokenSchema = z.string().min(1).optional();
 const exportFormatSchema = z.enum(["pdf", "svg", "png", "jpg"]);
 const launchPlatformSchema = z.enum(["auto", "macos", "windows", "wsl", "linux"]).optional();
+const probeMethodSchema = z.enum(["auto", "desktop", "com"]).optional();
 const plannerModeSchema = z.enum(["deterministic", "auto", "openai"]).optional();
 const semanticKindSchema = z
   .enum(["object_semantics", "style_reference", "publication_requirement", "document_state", "illustrator_capability"])
@@ -82,6 +84,63 @@ export function createAgentMcpServer(): McpServer {
         ok: report.ok,
         report
       });
+    }
+  );
+
+  server.registerTool(
+    "detect_illustrator_desktop",
+    {
+      title: "Detect Illustrator Desktop",
+      description: "Detect local Adobe Illustrator app candidates for desktop/JSX launch. Does not require OpenAI API credentials.",
+      inputSchema: {
+        platform: launchPlatformSchema
+      }
+    },
+    async ({ platform }) => {
+      const candidates = await detectIllustratorApps(platform);
+      return jsonToolResult({
+        ok: true,
+        platform: platform ?? "auto",
+        candidates
+      });
+    }
+  );
+
+  server.registerTool(
+    "probe_illustrator_communication",
+    {
+      title: "Probe Illustrator Communication",
+      description:
+        "Create a ping or circle JSX job, run it in Illustrator through COM or desktop launch, and optionally wait for result JSON that proves Illustrator communication.",
+      inputSchema: {
+        platform: launchPlatformSchema,
+        method: probeMethodSchema,
+        appPath: z.string().min(1).max(1000).optional(),
+        dryRun: z.boolean().optional(),
+        waitForResult: z.boolean().optional(),
+        autoConfirmDialog: z.boolean().optional(),
+        drawCircle: z.boolean().optional(),
+        timeoutMs: z.number().int().min(0).max(600_000).optional(),
+        dialogTimeoutMs: z.number().int().min(0).max(120_000).optional(),
+        intervalMs: z.number().int().min(100).max(60_000).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ platform, method, appPath, dryRun, waitForResult, autoConfirmDialog, drawCircle, timeoutMs, dialogTimeoutMs, intervalMs, root }) => {
+      const result = await probeIllustratorCommunication({
+        platform,
+        method,
+        appPath,
+        dryRun,
+        waitForResult,
+        autoConfirmDialog,
+        drawCircle,
+        timeoutMs,
+        dialogTimeoutMs,
+        intervalMs,
+        root
+      });
+      return jsonToolResult(result);
     }
   );
 
@@ -415,6 +474,8 @@ export function createAgentMcpServer(): McpServer {
               preferredPath: "Illustrator Beta MCP when configured; generated JSX fallback otherwise.",
               tools: [
                 "semantic_search_visual_knowledge",
+                "detect_illustrator_desktop",
+                "probe_illustrator_communication",
                 "prepare_cartoon_publication_workflow",
                 "execute_cartoon_publication_workflow",
                 "plan_cartoon_scene_job",

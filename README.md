@@ -12,6 +12,8 @@ The first practical goal is communication, not autonomous art direction. The bri
 ```bash
 npm install
 npm run build
+npm run illustrator:detect
+node dist/src/cli.js illustrator:probe --method com --draw-circle --wait
 npm run jsx:ping
 npm run jsx:cartoon
 npm run semantic:search -- "cartoon lab flask"
@@ -30,12 +32,23 @@ npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner openai
 ```
 
 The `jsx:*` commands write jobs under `var/jobs/` and expected results under `var/results/`. In Illustrator, run a generated job with `File > Scripts > Other Script`, then inspect the matching result JSON.
-When the host OS has a JSX file association, or when you pass an Illustrator app name/path, the bridge can ask the desktop to open the job:
+On Windows or WSL, the quickest no-API communication proof is COM automation:
+
+```bash
+node dist/src/cli.js illustrator:detect
+node dist/src/cli.js illustrator:probe --method com --draw-circle --wait --timeout-ms 30000
+```
+
+That command creates a JSX scene with one Illustrator vector circle, executes it through `Illustrator.Application.DoJavaScriptFile`, then waits for Illustrator to write `var/results/<job-id>.json` with `ok=true`.
+
+When the host OS has a JSX file association, or when you pass an Illustrator app name/path, the bridge can also ask the desktop to open the job:
 
 ```bash
 node dist/src/cli.js job:launch <job-id> --dry-run --platform macos --app "Adobe Illustrator"
 node dist/src/cli.js job:launch <job-id> --platform macos --app "Adobe Illustrator"
 ```
+
+Desktop JSX launch may show Adobe's external-script warning. Use `illustrator:probe --method desktop --auto-confirm-dialog --draw-circle --wait` only when you need to test that route; COM is preferred on Windows/WSL because it bypasses the warning dialog.
 
 After a document exists in Illustrator, generate an export job:
 
@@ -80,6 +93,7 @@ npm run mcp:serve
 
 That server exposes tools to create Illustrator JSX jobs and to proxy Illustrator Beta MCP calls when `ILLUSTRATOR_MCP_URL` and `ILLUSTRATOR_MCP_TOKEN` are configured.
 It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
+Use `detect_illustrator_desktop` and `probe_illustrator_communication` first to prove local no-key Illustrator communication. On Windows/WSL, pass `method: "com"`, `drawCircle: true`, and `waitForResult: true` to prove Illustrator can draw a circle and report completion.
 Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
 Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.

@@ -21,7 +21,17 @@ If it works, the command prints the tools exposed by Illustrator.
 
 Use this for regular Illustrator or when native MCP is unavailable.
 
-If Illustrator is installed on Windows but this repo is running in WSL, put the bridge root somewhere Windows can see directly:
+First prove no-API Illustrator control by drawing one circle:
+
+```bash
+npm run build
+node dist/src/cli.js illustrator:detect
+node dist/src/cli.js illustrator:probe --method com --draw-circle --wait --timeout-ms 30000
+```
+
+On Windows or WSL this uses Illustrator COM automation (`DoJavaScriptFile`) rather than an OpenAI API key. A successful result has `communicationConfirmed: true`, `kind: "cartoon_scene"`, and `elementCount: 1`.
+
+If Illustrator is installed on Windows but this repo is running in WSL, the bridge converts Linux paths to `//wsl.localhost/<distro>/...` inside generated JSX so Windows Illustrator can write the result JSON. You can still put the bridge root somewhere Windows can see directly:
 
 ```bash
 export ILLUSTRATOR_AGENT_BRIDGE_ROOT="/mnt/c/Users/<you>/IllustratorAgentBridge/var"
@@ -47,6 +57,13 @@ node dist/src/cli.js job:launch <job-id> --platform auto
 5. Check the matching `var/results/<job-id>.json`.
 
 Adobe shows an external JSX warning for scripts launched outside the installed scripts folder. Leave it enabled while developing unless you have a controlled local workflow.
+The desktop probe can try to confirm that prompt with PowerShell UIAutomation:
+
+```bash
+node dist/src/cli.js illustrator:probe --method desktop --auto-confirm-dialog --draw-circle --wait --timeout-ms 60000
+```
+
+Use COM on Windows/WSL when possible; the desktop route is mostly for proving file association and prompt handling.
 
 ## Local HTTP Bridge
 
@@ -154,6 +171,8 @@ npm run mcp:serve
 
 An MCP client can then call:
 
+- `detect_illustrator_desktop`
+- `probe_illustrator_communication`
 - `bridge_create_ping_job`
 - `bridge_create_cartoon_scene_job`
 - `bridge_create_export_job`

@@ -63,7 +63,39 @@ test("HTTP bridge serves the browser dashboard", async () => {
     assert.match(html, /\/v1\/workflows\/cartoon\/execute/);
     assert.match(html, /name="planner"/);
     assert.match(html, /OPENAI_MODEL or gpt-5\.5/);
+    assert.match(html, /Probe Illustrator/);
     assert.match(html, /minNonBlankRatio/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge probes Illustrator communication in dry-run mode", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-probe-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/illustrator/probe`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        platform: "macos",
+        appPath: "Adobe Illustrator",
+        dryRun: true
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      communicationConfirmed: boolean;
+      job: { jobPath: string };
+      launch: { dryRun: boolean };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.communicationConfirmed, false);
+    assert.equal(body.launch.dryRun, true);
+    await access(body.job.jobPath);
   } finally {
     await server.close();
   }

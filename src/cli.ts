@@ -2,6 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { startAgentMcpStdioServer } from "./agent/mcpServer.js";
 import { getGeneratedJobPaths } from "./bridge/files.js";
+import { detectIllustratorApps, probeIllustratorCommunication, type IllustratorProbeMethod } from "./bridge/illustratorProbe.js";
 import { createGeneratedJob } from "./bridge/jobs.js";
 import { generatedJobSummary } from "./bridge/jsxGenerator.js";
 import { LaunchJobError, launchJsxJob, type LaunchPlatform } from "./bridge/launcher.js";
@@ -37,6 +38,12 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "jsx:export":
       await makeExport(rest);
+      return;
+    case "illustrator:detect":
+      await illustratorDetect(rest);
+      return;
+    case "illustrator:probe":
+      await illustratorProbe(rest);
       return;
     case "plan:cartoon":
       await planCartoon(rest);
@@ -139,6 +146,31 @@ async function makeExport(args: string[]): Promise<void> {
   const job = await createGeneratedJob(command, optionValue(options, "root"));
 
   console.log(JSON.stringify({ ok: true, job: generatedJobSummary(job) }, null, 2));
+}
+
+async function illustratorDetect(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const platform = optionalLaunchPlatform(optionValue(options, "platform"));
+  const candidates = await detectIllustratorApps(platform);
+  console.log(JSON.stringify({ ok: true, platform: platform ?? "auto", candidates }, null, 2));
+}
+
+async function illustratorProbe(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const result = await probeIllustratorCommunication({
+    platform: optionalLaunchPlatform(optionValue(options, "platform")),
+    method: optionalProbeMethod(optionValue(options, "method")),
+    appPath: optionValue(options, "app"),
+    root: optionValue(options, "root"),
+    dryRun: flagValue(options, "dry-run"),
+    waitForResult: flagValue(options, "wait"),
+    autoConfirmDialog: flagValue(options, "auto-confirm-dialog"),
+    drawCircle: flagValue(options, "draw-circle"),
+    timeoutMs: optionValue(options, "timeout-ms") ? Number(optionValue(options, "timeout-ms")) : undefined,
+    dialogTimeoutMs: optionValue(options, "dialog-timeout-ms") ? Number(optionValue(options, "dialog-timeout-ms")) : undefined,
+    intervalMs: optionValue(options, "interval-ms") ? Number(optionValue(options, "interval-ms")) : undefined
+  });
+  console.log(JSON.stringify(result, null, 2));
 }
 
 async function serve(args: string[]): Promise<void> {
@@ -342,7 +374,7 @@ interface ParsedOptions {
   flags: Set<string>;
 }
 
-const flagOptions = new Set(["dry-run", "no-wait", "skip-qa"]);
+const flagOptions = new Set(["dry-run", "no-wait", "skip-qa", "wait", "auto-confirm-dialog", "draw-circle"]);
 
 function parseOptions(args: string[]): ParsedOptions {
   const positionals: string[] = [];
@@ -432,6 +464,8 @@ Commands:
   jsx:ping [--message TEXT] [--root DIR]
   jsx:cartoon [SCENE_JSON_PATH] [--root DIR]
   jsx:export --output PATH [--format pdf|svg|png|jpg] [--root DIR]
+  illustrator:detect [--platform auto|macos|windows|wsl|linux]
+  illustrator:probe [--platform auto|macos|windows|wsl|linux] [--method auto|desktop|com] [--app PATH_OR_NAME] [--dry-run] [--wait] [--auto-confirm-dialog] [--draw-circle] [--timeout-ms N] [--dialog-timeout-ms N] [--root DIR]
   plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--planner deterministic|auto|openai] [--model MODEL] [--root DIR] [--corpus PATH]
   workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--planner deterministic|auto|openai] [--model MODEL] [--root DIR] [--corpus PATH]
   workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--planner deterministic|auto|openai] [--model MODEL] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
@@ -499,6 +533,19 @@ function optionalPlannerMode(input: string | undefined): PlannerMode | undefined
   const value = input.toLowerCase();
   if (value !== "deterministic" && value !== "auto" && value !== "openai") {
     throw new ValidationError("planner must be deterministic, auto, or openai");
+  }
+
+  return value;
+}
+
+function optionalProbeMethod(input: string | undefined): IllustratorProbeMethod | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = input.toLowerCase();
+  if (value !== "auto" && value !== "desktop" && value !== "com") {
+    throw new ValidationError("method must be auto, desktop, or com");
   }
 
   return value;

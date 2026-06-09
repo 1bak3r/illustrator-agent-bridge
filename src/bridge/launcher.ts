@@ -105,7 +105,7 @@ export function jobIdFromScriptPath(scriptPath: string): string | undefined {
   return match ? normalizeJobId(match[1]) : undefined;
 }
 
-function resolveLaunchPlatform(input: LaunchPlatform | undefined): Exclude<LaunchPlatform, "auto"> {
+export function resolveLaunchPlatform(input: LaunchPlatform | undefined): Exclude<LaunchPlatform, "auto"> {
   const selected = input ?? "auto";
 
   if (selected !== "auto") {

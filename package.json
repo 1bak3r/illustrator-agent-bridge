@@ -16,6 +16,8 @@
     "jsx:ping": "node dist/src/cli.js jsx:ping",
     "jsx:cartoon": "node dist/src/cli.js jsx:cartoon examples/cartoon-scene.json",
     "jsx:export": "node dist/src/cli.js jsx:export",
+    "illustrator:detect": "node dist/src/cli.js illustrator:detect",
+    "illustrator:probe": "node dist/src/cli.js illustrator:probe",
     "plan:cartoon": "node dist/src/cli.js plan:cartoon",
     "workflow:cartoon": "node dist/src/cli.js workflow:cartoon",
     "workflow:execute-cartoon": "node dist/src/cli.js workflow:execute-cartoon",

@@ -1,15 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { isAbsolute, resolve } from "node:path";
 import type { BridgeCommand, GeneratedJob } from "./types.js";
-import { getGeneratedJobPaths, toIllustratorPath, writeGeneratedJob } from "./files.js";
+import { getGeneratedJobPaths, type IllustratorHostPlatform, toIllustratorPath, writeGeneratedJob } from "./files.js";
 import { generateJsx } from "./jsxGenerator.js";
 
-export async function createGeneratedJob(command: BridgeCommand, root?: string): Promise<GeneratedJob> {
+export interface CreateGeneratedJobOptions {
+  hostPlatform?: IllustratorHostPlatform;
+}
+
+export async function createGeneratedJob(command: BridgeCommand, root?: string, options: CreateGeneratedJobOptions = {}): Promise<GeneratedJob> {
   const id = randomUUID();
   const { jobPath, resultPath } = await getGeneratedJobPaths(id, root);
-  const illustratorJobPath = toIllustratorPath(jobPath);
-  const illustratorResultPath = toIllustratorPath(resultPath);
-  const jsx = generateJsx(toHostCommand(command), { id, resultPath: illustratorResultPath });
+  const illustratorJobPath = toIllustratorPath(jobPath, options.hostPlatform);
+  const illustratorResultPath = toIllustratorPath(resultPath, options.hostPlatform);
+  const jsx = generateJsx(toHostCommand(command, options.hostPlatform), { id, resultPath: illustratorResultPath });
   await writeGeneratedJob(jobPath, jsx);
 
   return {
@@ -22,7 +26,7 @@ export async function createGeneratedJob(command: BridgeCommand, root?: string):
   };
 }
 
-function toHostCommand(command: BridgeCommand): BridgeCommand {
+function toHostCommand(command: BridgeCommand, hostPlatform?: IllustratorHostPlatform): BridgeCommand {
   if (command.kind !== "export") {
     return command;
   }
@@ -31,6 +35,6 @@ function toHostCommand(command: BridgeCommand): BridgeCommand {
 
   return {
     ...command,
-    outputPath: toIllustratorPath(absoluteOutputPath)
+    outputPath: toIllustratorPath(absoluteOutputPath, hostPlatform)
   };
 }

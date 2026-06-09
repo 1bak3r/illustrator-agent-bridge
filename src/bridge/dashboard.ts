@@ -355,6 +355,14 @@ export function dashboardHtml(): string {
             </select>
           </label>
           <label>
+            Method
+            <select name="method">
+              <option value="auto">auto</option>
+              <option value="com">com</option>
+              <option value="desktop">desktop</option>
+            </select>
+          </label>
+          <label>
             Nonblank
             <input name="minNonBlankRatio" value="0.001" inputmode="decimal">
           </label>
@@ -381,10 +389,13 @@ export function dashboardHtml(): string {
           <label class="toggle"><input type="checkbox" name="dryRun" checked> Dry run</label>
           <label class="toggle"><input type="checkbox" name="waitForResults"> Wait</label>
           <label class="toggle"><input type="checkbox" name="skipQa"> Skip QA</label>
+          <label class="toggle"><input type="checkbox" name="autoConfirmDialog"> Confirm Prompt</label>
+          <label class="toggle"><input type="checkbox" name="drawCircle"> Draw Circle</label>
         </div>
         <div class="actions">
           <button type="button" id="execute">Execute</button>
           <button type="button" id="prepare" class="secondary">Prepare</button>
+          <button type="button" id="probe" class="secondary">Probe Illustrator</button>
           <button type="button" id="ping" class="ghost">Ping Job</button>
         </div>
       </form>
@@ -433,12 +444,15 @@ export function dashboardHtml(): string {
         planner: String(data.get("planner") || "deterministic"),
         format: String(data.get("format") || "png"),
         platform: String(data.get("platform") || "auto"),
+        method: String(data.get("method") || "auto"),
         width: numberValue(data, "width"),
         height: numberValue(data, "height"),
         minNonBlankRatio: numberValue(data, "minNonBlankRatio"),
         dryRun: data.has("dryRun"),
         waitForResults: data.has("waitForResults"),
-        skipQa: data.has("skipQa")
+        skipQa: data.has("skipQa"),
+        autoConfirmDialog: data.has("autoConfirmDialog"),
+        drawCircle: data.has("drawCircle")
       };
       const appPath = String(data.get("appPath") || "").trim();
       if (appPath) body.appPath = appPath;
@@ -535,6 +549,27 @@ export function dashboardHtml(): string {
             model: body.model,
             width: body.width,
             height: body.height
+          })
+        }));
+      } catch (error) {
+        show({ ok: false, error: String(error.message || error) });
+      }
+    });
+
+    document.querySelector("#probe").addEventListener("click", async () => {
+      try {
+        const body = payload();
+        show(await api("/v1/illustrator/probe", {
+          method: "POST",
+          body: JSON.stringify({
+            platform: body.platform,
+            method: body.method,
+            appPath: body.appPath,
+            dryRun: body.dryRun,
+            waitForResult: body.waitForResults,
+            autoConfirmDialog: body.autoConfirmDialog,
+            drawCircle: body.drawCircle,
+            timeoutMs: 60000
           })
         }));
       } catch (error) {
