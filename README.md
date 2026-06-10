@@ -7,6 +7,24 @@ Early bridge for connecting an LLM or browser agent to Adobe Illustrator, with t
 
 The first practical goal is communication, not autonomous art direction. The bridge can discover/call Illustrator MCP tools, or generate `.jsx` jobs that Illustrator can run and report back through a JSON result file.
 
+## Current Status
+
+The bridge has proven no-key Illustrator control on Windows Illustrator from WSL:
+
+- Detects an installed Illustrator desktop app.
+- Executes generated JSX through Windows COM with `Illustrator.Application.DoJavaScriptFile`.
+- Creates an Illustrator document and draws a named vector circle.
+- Reads Illustrator's result JSON back from `var/results/`.
+- Exposes the same probe through CLI, HTTP dashboard, and MCP tools for an agent/browser workflow.
+
+The proof command is:
+
+```bash
+node dist/src/cli.js illustrator:probe --method com --draw-circle --wait --timeout-ms 30000
+```
+
+See [docs/communication-proof.md](docs/communication-proof.md) for the concrete verification output and next engineering steps.
+
 ## Quick Start
 
 ```bash
