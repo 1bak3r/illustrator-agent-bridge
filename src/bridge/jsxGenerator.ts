@@ -1,4 +1,4 @@
-import type { BridgeCommand, CartoonScene, ElementStyle, ExportCommand, GeneratedJob, SceneElement } from "./types.js";
+import type { BridgeCommand, CartoonScene, ElementStyle, ExportCommand, GeneratedJob, PathPoint, SceneElement } from "./types.js";
 
 const DEFAULT_WIDTH = 720;
 const DEFAULT_HEIGHT = 480;
@@ -191,6 +191,22 @@ function drawElement(element: SceneElement, index: number): string {
     ].join("\n");
   }
 
+  if (element.type === "path") {
+    const points = element.points
+      .map((point) => `[${numberLiteral(point.x)}, docHeight - ${numberLiteral(point.y)}]`)
+      .join(", ");
+    return [
+      `    var item${index} = layer.pathItems.add();`,
+      `    item${index}.name = ${jsonLiteral(name)};`,
+      `    item${index}.setEntirePath([${points}]);`,
+      `    item${index}.closed = ${element.closed === false ? "false" : "true"};`,
+      ...element.points.map((point, pointIndex) => pathPointLines(index, pointIndex, point)),
+      styleLine(index, style)
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   const fill = style.fill ?? "#111111";
   return [
     `    var item${index} = layer.textFrames.add();`,
@@ -205,6 +221,28 @@ function drawElement(element: SceneElement, index: number): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function pathPointLines(itemIndex: number, pointIndex: number, point: PathPoint): string {
+  const lines: string[] = [];
+
+  if (point.leftX !== undefined && point.leftY !== undefined) {
+    lines.push(
+      `    item${itemIndex}.pathPoints[${pointIndex}].leftDirection = [${numberLiteral(point.leftX)}, docHeight - ${numberLiteral(point.leftY)}];`
+    );
+  }
+
+  if (point.rightX !== undefined && point.rightY !== undefined) {
+    lines.push(
+      `    item${itemIndex}.pathPoints[${pointIndex}].rightDirection = [${numberLiteral(point.rightX)}, docHeight - ${numberLiteral(point.rightY)}];`
+    );
+  }
+
+  if (point.pointType !== undefined) {
+    lines.push(`    item${itemIndex}.pathPoints[${pointIndex}].pointType = PointType.${point.pointType === "smooth" ? "SMOOTH" : "CORNER"};`);
+  }
+
+  return lines.join("\n");
 }
 
 function exportStatement(command: ExportCommand): string {

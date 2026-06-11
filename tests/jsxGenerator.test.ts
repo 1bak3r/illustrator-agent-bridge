@@ -41,6 +41,40 @@ test("generates named vector elements for a cartoon scene", () => {
   assert.match(jsx, /"head"/);
 });
 
+test("generates curved path vector elements for a complex scene", () => {
+  const jsx = generateJsx(
+    {
+      kind: "cartoon_scene",
+      scene: {
+        document: { title: "Path Smoke", width: 200, height: 200 },
+        elements: [
+          {
+            type: "path",
+            name: "curved ribbon",
+            x: 0,
+            y: 0,
+            closed: false,
+            points: [
+              { x: 10, y: 80, rightX: 40, rightY: 20, pointType: "smooth" },
+              { x: 100, y: 80, leftX: 70, leftY: 140, rightX: 130, rightY: 20, pointType: "smooth" },
+              { x: 190, y: 80, leftX: 160, leftY: 140, pointType: "smooth" }
+            ],
+            style: { fill: null, stroke: "#2667FF", strokeWidth: 8 }
+          }
+        ]
+      }
+    },
+    { id: "job-path", resultPath: "/tmp/illustrator-agent/result.json" }
+  );
+
+  assert.match(jsx, /"curved ribbon"/);
+  assert.match(jsx, /pathItems\.add/);
+  assert.match(jsx, /leftDirection = \[70, docHeight - 140\]/);
+  assert.match(jsx, /rightDirection = \[40, docHeight - 20\]/);
+  assert.match(jsx, /PointType\.SMOOTH/);
+  assert.match(jsx, /item0\.closed = false/);
+});
+
 test("generates an Illustrator export JSX job", () => {
   const jsx = generateJsx(
     {

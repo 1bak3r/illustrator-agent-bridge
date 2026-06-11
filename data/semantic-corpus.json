@@ -16,6 +16,30 @@
     "source": "local seed visual semantics"
   },
   {
+    "id": "shape.cat.full-body",
+    "kind": "shape_recipe",
+    "title": "Full cat vector recipe",
+    "tags": ["cat", "feline", "animal", "head", "ears", "whiskers", "tail", "paws"],
+    "text": "A full cat should be recognizable without a label: use a rounded body, separate head, two triangular ears, two eyes, small nose and mouth, three whiskers on each side, a curved tail, and four visible legs or paws. Keep the head and ears prominent because they define the silhouette, then add tail and paws so it reads as a complete animal.",
+    "source": "local shape grammar seed"
+  },
+  {
+    "id": "shape.lock.padlock",
+    "kind": "shape_recipe",
+    "title": "Padlock vector recipe",
+    "tags": ["lock", "padlock", "security", "shackle", "keyhole", "body"],
+    "text": "A padlock reads as a large solid body with a U-shaped shackle above it, visible shackle pins or sockets at the top of the body, and a centered keyhole made from a round top and narrow vertical slot. Highlights and edge strokes help separate the metal shackle from the lock body.",
+    "source": "local shape grammar seed"
+  },
+  {
+    "id": "shape.key.house-key",
+    "kind": "shape_recipe",
+    "title": "House key vector recipe",
+    "tags": ["key", "house-key", "bow", "ring", "shaft", "teeth", "ridge"],
+    "text": "A simple key needs a large circular bow or ring with an inner hole, a long straight shaft, a shoulder or collar near the bow, and several distinct teeth or bit protrusions at the far end. Add a ridge or groove along the shaft so the key has mechanical detail instead of looking like a plain bar.",
+    "source": "local shape grammar seed"
+  },
+  {
     "id": "style.publication-cartoon-vector",
     "kind": "style_reference",
     "title": "Publication cartoon vector style",
@@ -46,5 +70,85 @@
     "tags": ["semantic", "planning", "retrieval", "agent"],
     "text": "Before drawing, retrieve object semantics and publication constraints, then turn those into a structured scene plan. The drawing command should be concrete and validated; retrieved text should inform the plan rather than being executed directly.",
     "source": "local bridge workflow"
+  },
+  {
+    "id": "concept.molecular-self-assembly",
+    "kind": "scientific_concept",
+    "title": "Molecular self-assembly",
+    "tags": ["molecular", "assembly", "polymer", "supramolecular", "network", "monomer"],
+    "text": "Molecular self-assembly is clearest as small building blocks organizing into a larger ordered structure. Show monomers as repeated nodes, weak interactions as dotted or pale connector lines, and the final structure as a clustered network or ordered fiber. Use arrows from disordered particles to an organized motif.",
+    "source": "local scientific visual semantics"
+  },
+  {
+    "id": "concept.catalytic-reaction-cycle",
+    "kind": "scientific_concept",
+    "title": "Catalytic reaction cycle",
+    "tags": ["catalyst", "catalysis", "reaction", "active-site", "surface", "energy"],
+    "text": "A catalytic mechanism reads well as a surface or active site that binds reactants, lowers an energy barrier, and releases product. Use a solid catalyst slab, highlighted active site, incoming reactant molecules, outgoing product molecules, and an energy landscape inset with a lower catalyzed path.",
+    "source": "local scientific visual semantics"
+  },
+  {
+    "id": "concept.cell-membrane-transport",
+    "kind": "scientific_concept",
+    "title": "Cell membrane transport",
+    "tags": ["cell", "membrane", "bilayer", "protein", "transport", "gradient"],
+    "text": "A membrane transport concept needs a bilayer barrier, embedded protein channel, concentration gradient, and directional arrows. Use two rows of lipid heads with tails between them, a contrasting channel shape, particles on both sides, and arrows that show selective movement.",
+    "source": "local scientific visual semantics"
+  },
+  {
+    "id": "concept.electron-transfer",
+    "kind": "scientific_concept",
+    "title": "Electron transfer and charge flow",
+    "tags": ["electron", "charge", "redox", "energy", "donor", "acceptor", "arrow"],
+    "text": "Electron transfer is readable as donor and acceptor sites connected by a bright directional path. Show source and sink nodes, electron dots, a curved transfer arrow, and a small energy-level diagram. Use color contrast to distinguish reduced and oxidized states.",
+    "source": "local scientific visual semantics"
+  },
+  {
+    "id": "concept.phase-separation",
+    "kind": "scientific_concept",
+    "title": "Phase separation and domains",
+    "tags": ["phase", "separation", "droplet", "domain", "interface", "condensate"],
+    "text": "Phase separation can be shown as mixed particles separating into dense droplets or domains. Use semi-transparent droplets, clustered particles inside, sparse particles outside, and an interface outline. A before-to-after arrow helps explain the transition.",
+    "source": "local scientific visual semantics"
+  },
+  {
+    "id": "concept.biobased-material-cycle",
+    "kind": "scientific_concept",
+    "title": "Biobased material cycle",
+    "tags": ["sustainability", "biomass", "lignin", "soy", "feedstock", "polymer", "circular"],
+    "text": "A biobased material cycle should show renewable feedstock converting into functional material and then returning through reuse or biodegradation. Use plant or biomass icons, reaction/processing arrows, polymer material blocks, product use, and a circular arrow path to emphasize system flow.",
+    "source": "local scientific visual semantics"
+  },
+  {
+    "id": "metaphor.abstract-mechanism-to-map",
+    "kind": "visual_metaphor",
+    "title": "Abstract mechanism as a map",
+    "tags": ["concept", "mechanism", "map", "layers", "pathway", "system"],
+    "text": "For conceptual science, use a map-like layout: context on the left, mechanism in the center, outcome on the right, and feedback or regulation as curved arrows. Keep each object group visually distinct and label only the conceptual roles, not every decoration.",
+    "source": "local visual metaphor guide"
+  },
+  {
+    "id": "metaphor.multiscale-zoom",
+    "kind": "visual_metaphor",
+    "title": "Multiscale zoom hierarchy",
+    "tags": ["multiscale", "zoom", "molecule", "material", "cell", "system"],
+    "text": "A multiscale concept is effective as nested zoom panels: macroscale object, mesoscale structure, and molecular detail. Use connecting lines or magnifier rings, and make the smallest scale visually simpler rather than cramming all chemistry into one panel.",
+    "source": "local visual metaphor guide"
+  },
+  {
+    "id": "requirement.scientific-concept-legibility",
+    "kind": "publication_requirement",
+    "title": "Scientific concept figure legibility",
+    "tags": ["scientific", "concept", "mechanism", "publication", "legend"],
+    "text": "A complex scientific concept figure should still communicate one central mechanism. Separate context, mechanism, and outcome; use consistent arrow language; avoid overlapping labels; and keep every repeated symbol visually consistent across the scene.",
+    "source": "local publication requirements"
+  },
+  {
+    "id": "capability.illustrator-bezier-paths",
+    "kind": "illustrator_capability",
+    "title": "Illustrator Bezier path drawing",
+    "tags": ["illustrator", "extendscript", "path", "bezier", "curve", "point"],
+    "text": "The bridge can emit Illustrator path items with anchor points, left and right Bezier handles, smooth or corner point types, open paths, closed paths, fills, strokes, opacity, and object names. Use paths for membranes, energy curves, ribbons, polymer chains, and abstract flow lines.",
+    "source": "local bridge capability model"
   }
 ]

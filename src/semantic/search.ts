@@ -27,11 +27,31 @@ const STOPWORDS = new Set([
 
 const QUERY_EXPANSIONS: Record<string, string[]> = {
   cartoon: ["simple", "bold", "outline", "exaggerated", "friendly"],
+  catalyst: ["reaction", "active", "site", "surface", "energy"],
+  catalysis: ["catalyst", "reaction", "active", "site", "surface"],
+  cell: ["membrane", "organelle", "protein", "transport", "biology"],
+  concept: ["mechanism", "system", "process", "metaphor", "diagram"],
+  diffusion: ["gradient", "transport", "membrane", "particle"],
+  electron: ["charge", "transfer", "energy", "arrow", "redox"],
+  energy: ["landscape", "barrier", "state", "transition"],
   figure: ["publication", "readability", "caption", "export"],
   flask: ["glassware", "reaction", "liquid", "neck", "round"],
+  cat: ["feline", "head", "ear", "whisker", "tail", "paw"],
   lab: ["scientist", "bench", "flask", "goggles"],
+  key: ["bow", "ring", "shaft", "tooth", "lock"],
+  lock: ["padlock", "shackle", "keyhole", "body", "secure"],
+  membrane: ["cell", "bilayer", "transport", "protein", "barrier"],
+  molecule: ["atom", "bond", "network", "polymer", "structure"],
+  molecular: ["molecule", "atom", "bond", "network", "polymer"],
+  phase: ["droplet", "domain", "separation", "interface"],
+  polymer: ["chain", "monomer", "network", "macromolecule", "brush"],
   publication: ["readability", "contrast", "vector", "export", "label"],
+  reaction: ["catalyst", "arrow", "reactant", "product", "energy"],
   scientist: ["head", "goggles", "coat", "lab"],
+  shape: ["combination", "silhouette", "outline", "part", "vector"],
+  scientific: ["concept", "mechanism", "system", "process", "evidence"],
+  svg: ["vector", "path", "shape", "fill", "stroke"],
+  sustainability: ["cycle", "feedstock", "biomass", "product", "impact"],
   vector: ["path", "stroke", "fill", "layer", "illustrator"]
 };
 
@@ -176,6 +196,10 @@ function validateItem(input: unknown): SemanticItem {
 
   if (
     kind !== "object_semantics" &&
+    kind !== "shape_recipe" &&
+    kind !== "shape_combination" &&
+    kind !== "scientific_concept" &&
+    kind !== "visual_metaphor" &&
     kind !== "style_reference" &&
     kind !== "publication_requirement" &&
     kind !== "document_state" &&

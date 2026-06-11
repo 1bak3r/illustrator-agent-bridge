@@ -3,6 +3,7 @@ import type {
   CartoonScene,
   ElementStyle,
   ExportFormat,
+  PathPoint,
   Point,
   SceneDocument,
   SceneElement
@@ -153,6 +154,26 @@ function normalizeElement(input: unknown, path: string): SceneElement {
     };
   }
 
+  if (type === "path") {
+    if (!Array.isArray(value.points)) {
+      throw new ValidationError(`${path}.points must be an array`);
+    }
+    const closed = value.closed === undefined ? undefined : booleanValue(value.closed, `${path}.closed`);
+    const minimumPoints = closed === false ? 2 : 3;
+    if (value.points.length < minimumPoints) {
+      throw new ValidationError(`${path}.points must contain at least ${minimumPoints} points`);
+    }
+    if (value.points.length > 500) {
+      throw new ValidationError(`${path}.points cannot contain more than 500 points`);
+    }
+    return {
+      ...base,
+      type,
+      points: value.points.map((point, index) => normalizePathPoint(point, `${path}.points[${index}]`)),
+      closed
+    };
+  }
+
   throw new ValidationError(`${path}.type is not supported: ${type}`);
 }
 
@@ -161,6 +182,24 @@ function normalizePoint(input: unknown, path: string): Point {
   return {
     x: finiteNumber(value.x, `${path}.x`),
     y: finiteNumber(value.y, `${path}.y`)
+  };
+}
+
+function normalizePathPoint(input: unknown, path: string): PathPoint {
+  const value = object(input, path);
+  const pointType = value.pointType === undefined ? undefined : stringValue(value.pointType, `${path}.pointType`);
+  if (pointType !== undefined && pointType !== "corner" && pointType !== "smooth") {
+    throw new ValidationError(`${path}.pointType must be corner or smooth`);
+  }
+
+  return {
+    x: finiteNumber(value.x, `${path}.x`),
+    y: finiteNumber(value.y, `${path}.y`),
+    leftX: optionalFiniteNumber(value.leftX, `${path}.leftX`),
+    leftY: optionalFiniteNumber(value.leftY, `${path}.leftY`),
+    rightX: optionalFiniteNumber(value.rightX, `${path}.rightX`),
+    rightY: optionalFiniteNumber(value.rightY, `${path}.rightY`),
+    pointType
   };
 }
 
@@ -209,6 +248,22 @@ function optionalString(input: unknown, path: string, maxLength: number): string
 function finiteNumber(input: unknown, path: string): number {
   if (typeof input !== "number" || !Number.isFinite(input)) {
     throw new ValidationError(`${path} must be a finite number`);
+  }
+
+  return input;
+}
+
+function optionalFiniteNumber(input: unknown, path: string): number | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  return finiteNumber(input, path);
+}
+
+function booleanValue(input: unknown, path: string): boolean {
+  if (typeof input !== "boolean") {
+    throw new ValidationError(`${path} must be a boolean`);
   }
 
   return input;

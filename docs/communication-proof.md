@@ -70,6 +70,23 @@ A successful probe returns:
 
 The generated JSX creates a `360 x 240` RGB document and one ellipse named `communication proof circle` with width and height `140`.
 
+## Complex Shape and Mouse Proof
+
+After the circle proof, use the same COM path for a richer vector scene:
+
+```bash
+node dist/src/cli.js illustrator:probe \
+  --platform auto \
+  --method com \
+  --draw-complex \
+  --wait \
+  --mouse-proof \
+  --mouse-action click \
+  --timeout-ms 30000
+```
+
+The complex probe writes a scene with multiple named Illustrator vector objects, including curved Bezier `path` elements. When `--mouse-proof` is set, the bridge also drives the actual Windows mouse by locating Illustrator's live window, focusing it, measuring its bounds, and clicking relative to that window. The probe result includes `mouseProof.ok`, the matched window, bounds, and cursor coordinates.
+
 ## Direct Illustrator Object Check
 
 After the probe, this PowerShell check reads the active Illustrator document through COM:
@@ -108,7 +125,7 @@ More complex cartoon scenes use the same path. The higher-level planner already 
 - CLI: `illustrator:detect`, `illustrator:probe`
 - HTTP: `GET /v1/illustrator/detect`, `POST /v1/illustrator/probe`
 - Dashboard: `http://127.0.0.1:4317/dashboard`
-- MCP: `detect_illustrator_desktop`, `probe_illustrator_communication`
+- MCP: `detect_illustrator_desktop`, `probe_illustrator_communication`, `drive_illustrator_mouse`
 
 ## Next Work
 

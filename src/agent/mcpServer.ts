@@ -1,19 +1,27 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
+import { runJsxViaIllustratorCom } from "../bridge/comAutomation.js";
 import { getGeneratedJobPaths } from "../bridge/files.js";
 import { detectIllustratorApps, probeIllustratorCommunication } from "../bridge/illustratorProbe.js";
 import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
-import { launchJsxJob } from "../bridge/launcher.js";
+import { launchJsxJob, resolveLaunchPlatform } from "../bridge/launcher.js";
+import { driveIllustratorMouse } from "../bridge/mouseAutomation.js";
 import { normalizeJobId, readJobStatus, waitForJobResult } from "../bridge/results.js";
 import { normalizeScene } from "../bridge/validation.js";
 import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } from "../mcp/illustratorClient.js";
+import { planObjectShapeScene } from "../planner/objectShapePlanner.js";
 import { planCartoonSceneWithMode } from "../planner/plannerRouter.js";
+import { planScientificConceptScene } from "../planner/scientificConceptPlanner.js";
 import { inspectExportArtifact } from "../qa/exportQa.js";
+import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
+import { inspectVectorShapeFiles } from "../semantic/vectorShapeIngest.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
+import { executeObjectShapeWorkflow } from "../workflow/objectExecutor.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
+import { prepareObjectShapeWorkflow } from "../workflow/objectWorkflow.js";
 
 const optionalRootSchema = z.string().min(1).optional();
 const optionalUrlSchema = z.string().url().optional();
@@ -21,9 +29,23 @@ const optionalTokenSchema = z.string().min(1).optional();
 const exportFormatSchema = z.enum(["pdf", "svg", "png", "jpg"]);
 const launchPlatformSchema = z.enum(["auto", "macos", "windows", "wsl", "linux"]).optional();
 const probeMethodSchema = z.enum(["auto", "desktop", "com"]).optional();
+const mouseActionSchema = z.enum(["move", "click", "double-click", "drag"]).optional();
+const mouseButtonSchema = z.enum(["left", "right"]).optional();
 const plannerModeSchema = z.enum(["deterministic", "auto", "openai"]).optional();
+const objectShapeTargetSchema = z.enum(["cat", "lock", "key"]);
+const objectWorkflowRunModeSchema = z.enum(["launch", "com"]).optional();
 const semanticKindSchema = z
-  .enum(["object_semantics", "style_reference", "publication_requirement", "document_state", "illustrator_capability"])
+  .enum([
+    "object_semantics",
+    "shape_recipe",
+    "shape_combination",
+    "scientific_concept",
+    "visual_metaphor",
+    "style_reference",
+    "publication_requirement",
+    "document_state",
+    "illustrator_capability"
+  ])
   .optional();
 
 export function createAgentMcpServer(): McpServer {
@@ -59,6 +81,29 @@ export function createAgentMcpServer(): McpServer {
         query,
         resultCount: results.length,
         results
+      });
+    }
+  );
+
+  server.registerTool(
+    "inspect_vector_shape_files",
+    {
+      title: "Inspect Vector Shape Files",
+      description:
+        "Inspect local/reviewed SVG, AI, EPS, PDF, or bridge scene JSON files and return shape_combination semantic items that can be merged into a corpus for future semantic search.",
+      inputSchema: {
+        paths: z.array(z.string().min(1).max(1000)).min(1).max(50),
+        limit: z.number().int().min(1).max(10_000).optional()
+      }
+    },
+    async ({ paths, limit }) => {
+      const profiles = await inspectVectorShapeFiles(paths, { limit });
+      return jsonToolResult({
+        ok: true,
+        inputCount: paths.length,
+        profileCount: profiles.length,
+        profiles,
+        items: profiles.map((profile) => profile.item)
       });
     }
   );
@@ -120,13 +165,43 @@ export function createAgentMcpServer(): McpServer {
         waitForResult: z.boolean().optional(),
         autoConfirmDialog: z.boolean().optional(),
         drawCircle: z.boolean().optional(),
+        drawComplex: z.boolean().optional(),
+        mouseProof: z.boolean().optional(),
+        mouseAction: mouseActionSchema,
+        mouseX: z.number().min(0).max(1).optional(),
+        mouseY: z.number().min(0).max(1).optional(),
+        mouseToX: z.number().min(0).max(1).optional(),
+        mouseToY: z.number().min(0).max(1).optional(),
+        mouseDurationMs: z.number().int().min(0).max(30_000).optional(),
+        mouseWindowTitlePattern: z.string().min(1).max(200).optional(),
         timeoutMs: z.number().int().min(0).max(600_000).optional(),
         dialogTimeoutMs: z.number().int().min(0).max(120_000).optional(),
         intervalMs: z.number().int().min(100).max(60_000).optional(),
         root: optionalRootSchema
       }
     },
-    async ({ platform, method, appPath, dryRun, waitForResult, autoConfirmDialog, drawCircle, timeoutMs, dialogTimeoutMs, intervalMs, root }) => {
+    async ({
+      platform,
+      method,
+      appPath,
+      dryRun,
+      waitForResult,
+      autoConfirmDialog,
+      drawCircle,
+      drawComplex,
+      mouseProof,
+      mouseAction,
+      mouseX,
+      mouseY,
+      mouseToX,
+      mouseToY,
+      mouseDurationMs,
+      mouseWindowTitlePattern,
+      timeoutMs,
+      dialogTimeoutMs,
+      intervalMs,
+      root
+    }) => {
       const result = await probeIllustratorCommunication({
         platform,
         method,
@@ -135,10 +210,55 @@ export function createAgentMcpServer(): McpServer {
         waitForResult,
         autoConfirmDialog,
         drawCircle,
+        drawComplex,
+        mouseProof,
+        mouseAction,
+        mouseX,
+        mouseY,
+        mouseToX,
+        mouseToY,
+        mouseDurationMs,
+        mouseWindowTitlePattern,
         timeoutMs,
         dialogTimeoutMs,
         intervalMs,
         root
+      });
+      return jsonToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    "drive_illustrator_mouse",
+    {
+      title: "Drive Illustrator Mouse",
+      description:
+        "Move, click, double-click, or drag the actual Windows mouse relative to the detected Illustrator window. Use dryRun first; live runs fail unless Illustrator can be focused or the target point is confirmed to belong to Illustrator.",
+      inputSchema: {
+        platform: launchPlatformSchema,
+        action: mouseActionSchema,
+        button: mouseButtonSchema,
+        x: z.number().min(0).max(1).optional(),
+        y: z.number().min(0).max(1).optional(),
+        toX: z.number().min(0).max(1).optional(),
+        toY: z.number().min(0).max(1).optional(),
+        durationMs: z.number().int().min(0).max(30_000).optional(),
+        windowTitlePattern: z.string().min(1).max(200).optional(),
+        dryRun: z.boolean().optional()
+      }
+    },
+    async ({ platform, action, button, x, y, toX, toY, durationMs, windowTitlePattern, dryRun }) => {
+      const result = await driveIllustratorMouse({
+        platform: resolveLaunchPlatform(platform),
+        action,
+        button,
+        relativeX: x,
+        relativeY: y,
+        endRelativeX: toX,
+        endRelativeY: toY,
+        durationMs,
+        windowTitlePattern,
+        dryRun
       });
       return jsonToolResult(result);
     }
@@ -256,6 +376,120 @@ export function createAgentMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "prepare_object_shape_workflow",
+    {
+      title: "Prepare Guarded Object Shape Workflow",
+      description:
+        "Prepare a guarded cat/lock/key Illustrator workflow: semantic object plan, shape guard, scene JSX job, export JSX job, and runbook.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000),
+        outputPath: z.string().min(1).max(1000),
+        format: exportFormatSchema.optional(),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        evidenceLimit: z.number().int().min(1).max(25).optional(),
+        maxGuardIterations: z.number().int().min(1).max(10).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ prompt, outputPath, format, width, height, title, evidenceLimit, maxGuardIterations, root }) => {
+      const workflow = await prepareObjectShapeWorkflow({
+        prompt,
+        outputPath,
+        format,
+        width,
+        height,
+        title,
+        evidenceLimit,
+        maxGuardIterations,
+        root
+      });
+      return jsonToolResult(workflow);
+    }
+  );
+
+  server.registerTool(
+    "execute_object_shape_workflow",
+    {
+      title: "Execute Guarded Object Shape Workflow",
+      description:
+        "Prepare a guarded cat/lock/key object workflow, stop with nextGoalPrompt if the object guard fails, otherwise run scene/export JSX jobs and optional export QA.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000),
+        outputPath: z.string().min(1).max(1000),
+        format: exportFormatSchema.optional(),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        evidenceLimit: z.number().int().min(1).max(25).optional(),
+        maxGuardIterations: z.number().int().min(1).max(10).optional(),
+        runMode: objectWorkflowRunModeSchema,
+        platform: launchPlatformSchema,
+        appPath: z.string().min(1).max(1000).optional(),
+        dryRun: z.boolean().optional(),
+        waitForResults: z.boolean().optional(),
+        timeoutMs: z.number().int().min(0).max(600_000).optional(),
+        intervalMs: z.number().int().min(100).max(60_000).optional(),
+        skipQa: z.boolean().optional(),
+        minBytes: z.number().int().min(0).optional(),
+        minWidth: z.number().int().min(1).optional(),
+        minHeight: z.number().int().min(1).optional(),
+        minNonBlankRatio: z.number().min(0).max(1).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({
+      prompt,
+      outputPath,
+      format,
+      width,
+      height,
+      title,
+      evidenceLimit,
+      maxGuardIterations,
+      runMode,
+      platform: launchPlatform,
+      appPath,
+      dryRun,
+      waitForResults,
+      timeoutMs,
+      intervalMs,
+      skipQa,
+      minBytes,
+      minWidth,
+      minHeight,
+      minNonBlankRatio,
+      root
+    }) => {
+      const execution = await executeObjectShapeWorkflow({
+        prompt,
+        outputPath,
+        format,
+        width,
+        height,
+        title,
+        evidenceLimit,
+        maxGuardIterations,
+        runMode,
+        launchPlatform,
+        appPath,
+        dryRun,
+        waitForResults,
+        timeoutMs,
+        intervalMs,
+        skipQa,
+        minBytes,
+        minWidth,
+        minHeight,
+        minNonBlankRatio,
+        root
+      });
+      return jsonToolResult(execution);
+    }
+  );
+
+  server.registerTool(
     "plan_cartoon_scene_job",
     {
       title: "Plan Cartoon Scene and Create JSX Job",
@@ -285,6 +519,84 @@ export function createAgentMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "plan_scientific_concept_scene_job",
+    {
+      title: "Plan Scientific Concept Scene and Create JSX Job",
+      description:
+        "Run semantic searches for scientific concepts, visual metaphors, object semantics, and publication constraints, then create a complex Illustrator vector scene job.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1500),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        evidenceLimit: z.number().int().min(1).max(25).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ prompt, width, height, title, evidenceLimit, root }) => {
+      const corpus = await loadDefaultCorpus();
+      const plan = planScientificConceptScene(prompt, corpus, { width, height, title, evidenceLimit });
+      const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, root);
+      return jsonToolResult({
+        ok: true,
+        plan,
+        job: generatedJobSummary(job),
+        run: runInstructions(job)
+      });
+    }
+  );
+
+  server.registerTool(
+    "plan_object_shape_scene_job",
+    {
+      title: "Plan Guarded Object Shape Scene and Create JSX Job",
+      description:
+        "Search local shape recipes and object semantics, create a recognizable cat/lock/key vector scene, run the local shape guard, and create an Illustrator JSX job. If guard.ok is false, feed guard.nextPrompt into the next iteration.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000),
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        evidenceLimit: z.number().int().min(1).max(25).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ prompt, width, height, title, evidenceLimit, root }) => {
+      const corpus = await loadDefaultCorpus();
+      const plan = planObjectShapeScene(prompt, corpus, { width, height, title, evidenceLimit });
+      const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, root);
+      return jsonToolResult({
+        ok: true,
+        plan,
+        job: generatedJobSummary(job),
+        run: runInstructions(job)
+      });
+    }
+  );
+
+  server.registerTool(
+    "guard_object_shape_scene",
+    {
+      title: "Guard Object Shape Scene",
+      description:
+        "Check whether a structured Illustrator vector scene contains the recognizable parts of a cat, lock, or key. Returns guard.nextPrompt for the next refinement pass when checks fail.",
+      inputSchema: {
+        target: objectShapeTargetSchema,
+        scene: z.unknown(),
+        prompt: z.string().min(1).max(1000).optional()
+      }
+    },
+    async ({ target, scene, prompt }) => {
+      const normalizedScene = normalizeScene(scene);
+      const guard = guardObjectShapeScene(target, normalizedScene, prompt);
+      return jsonToolResult({
+        ok: guard.ok,
+        guard
+      });
+    }
+  );
+
+  server.registerTool(
     "bridge_launch_job",
     {
       title: "Launch Illustrator JSX Job",
@@ -301,6 +613,30 @@ export function createAgentMcpServer(): McpServer {
     async ({ jobId, platform, appPath, dryRun, root }) => {
       const { jobPath } = await getGeneratedJobPaths(normalizeJobId(jobId), root);
       const result = await launchJsxJob(jobPath, { platform, appPath, dryRun, root });
+      return jsonToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    "bridge_run_job_via_com",
+    {
+      title: "Run Illustrator JSX Job via COM",
+      description:
+        "Execute a generated JSX job through Windows Illustrator COM DoJavaScriptFile. Prefer this on Windows/WSL when a job should run without desktop script-warning prompts.",
+      inputSchema: {
+        jobId: z.string().min(1),
+        platform: launchPlatformSchema,
+        dryRun: z.boolean().optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({ jobId, platform, dryRun, root }) => {
+      const { jobPath } = await getGeneratedJobPaths(normalizeJobId(jobId), root);
+      const result = await runJsxViaIllustratorCom(jobPath, {
+        platform: resolveLaunchPlatform(platform),
+        dryRun,
+        root
+      });
       return jsonToolResult(result);
     }
   );
@@ -474,17 +810,25 @@ export function createAgentMcpServer(): McpServer {
               preferredPath: "Illustrator Beta MCP when configured; generated JSX fallback otherwise.",
               tools: [
                 "semantic_search_visual_knowledge",
+                "inspect_vector_shape_files",
                 "detect_illustrator_desktop",
                 "probe_illustrator_communication",
+                "drive_illustrator_mouse",
                 "prepare_cartoon_publication_workflow",
                 "execute_cartoon_publication_workflow",
+                "prepare_object_shape_workflow",
+                "execute_object_shape_workflow",
                 "plan_cartoon_scene_job",
+                "plan_scientific_concept_scene_job",
+                "plan_object_shape_scene_job",
+                "guard_object_shape_scene",
                 "illustrator_beta_list_tools",
                 "illustrator_beta_call_tool",
                 "bridge_create_ping_job",
                 "bridge_create_cartoon_scene_job",
                 "bridge_create_export_job",
                 "bridge_launch_job",
+                "bridge_run_job_via_com",
                 "bridge_get_job_status",
                 "bridge_wait_for_job_result",
                 "qa_export_artifact"

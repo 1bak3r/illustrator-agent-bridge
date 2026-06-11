@@ -31,6 +31,15 @@ node dist/src/cli.js illustrator:probe --method com --draw-circle --wait --timeo
 
 On Windows or WSL this uses Illustrator COM automation (`DoJavaScriptFile`) rather than an OpenAI API key. A successful result has `communicationConfirmed: true`, `kind: "cartoon_scene"`, and `elementCount: 1`.
 
+Then prove a richer vector scene and actual mouse control:
+
+```bash
+npm run illustrator:mouse -- --action move --x 0.5 --y 0.5 --dry-run
+node dist/src/cli.js illustrator:probe --method com --draw-complex --wait --mouse-proof --mouse-action click --timeout-ms 30000
+```
+
+The complex probe creates a `640 x 420` Illustrator document with curved paths, polygons, ellipses, lines, rectangles, and text. The mouse proof finds the running Illustrator window, restores/focuses it, measures its bounds, then moves or clicks relative to that window. It fails instead of clicking if Illustrator cannot be focused.
+
 If Illustrator is installed on Windows but this repo is running in WSL, the bridge converts Linux paths to `//wsl.localhost/<distro>/...` inside generated JSX so Windows Illustrator can write the result JSON. You can still put the bridge root somewhere Windows can see directly:
 
 ```bash
@@ -105,6 +114,7 @@ Plan from a prompt, retrieve semantic evidence, run static QA, and create the sc
 
 ```bash
 npm run plan:cartoon -- "cartoon lab scientist with flask"
+npm run plan:scientific -- "polymer membrane electron transfer catalytic concept"
 ```
 
 Use the optional OpenAI planner by setting an API key and choosing `auto` or `openai`:
@@ -143,6 +153,13 @@ node dist/src/cli.js job:launch <scene-job-id> --platform auto
 node dist/src/cli.js job:wait <scene-job-id> --timeout-ms 60000
 ```
 
+On Windows/WSL, any generated scene job can run through COM instead of desktop launch:
+
+```bash
+node dist/src/cli.js job:run-com <scene-job-id> --platform auto
+node dist/src/cli.js job:wait <scene-job-id> --timeout-ms 60000
+```
+
 3. Launch or manually run the export job in Illustrator:
 
 ```bash
@@ -173,11 +190,14 @@ An MCP client can then call:
 
 - `detect_illustrator_desktop`
 - `probe_illustrator_communication`
+- `drive_illustrator_mouse`
 - `bridge_create_ping_job`
 - `bridge_create_cartoon_scene_job`
 - `bridge_create_export_job`
 - `bridge_launch_job`
+- `bridge_run_job_via_com`
 - `plan_cartoon_scene_job`
+- `plan_scientific_concept_scene_job`
 - `prepare_cartoon_publication_workflow`
 - `execute_cartoon_publication_workflow`
 - `bridge_get_job_status`

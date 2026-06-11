@@ -49,3 +49,30 @@ test("probeIllustratorCommunication can create a circle drawing probe for deskto
   assert.match(jsx, /layer\.pathItems\.ellipse/);
   assert.match(jsx, /communication proof circle/);
 });
+
+test("probeIllustratorCommunication can create a complex shape probe with mouse dry-run proof", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-complex-probe-"));
+  const result = await probeIllustratorCommunication({
+    root,
+    platform: "wsl",
+    method: "com",
+    dryRun: true,
+    drawComplex: true,
+    mouseProof: true,
+    mouseAction: "click",
+    mouseX: 0.45,
+    mouseY: 0.55
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.method, "com");
+  assert.equal(result.mouseProof?.action, "dry-run");
+  assert.match(result.mouseProof?.stdout ?? "", /SetCursorPos/);
+
+  const jsx = await readFile(result.job.jobPath, "utf8");
+  assert.match(jsx, /Illustrator Bridge Complex Shape Probe/);
+  assert.match(jsx, /complex proof curved ribbon/);
+  assert.match(jsx, /complex proof flask body/);
+  assert.match(jsx, /PointType\.SMOOTH/);
+  assert.match(jsx, /"elementCount":11/);
+});

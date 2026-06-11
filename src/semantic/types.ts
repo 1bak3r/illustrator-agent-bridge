@@ -1,5 +1,9 @@
 export type SemanticKind =
   | "object_semantics"
+  | "shape_recipe"
+  | "shape_combination"
+  | "scientific_concept"
+  | "visual_metaphor"
   | "style_reference"
   | "publication_requirement"
   | "document_state"

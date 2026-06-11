@@ -363,8 +363,19 @@ export function dashboardHtml(): string {
             </select>
           </label>
           <label>
+            Run Mode
+            <select name="runMode">
+              <option value="launch">launch</option>
+              <option value="com">com</option>
+            </select>
+          </label>
+          <label>
             Nonblank
             <input name="minNonBlankRatio" value="0.001" inputmode="decimal">
+          </label>
+          <label>
+            Guard Tries
+            <input name="maxGuardIterations" value="3" inputmode="numeric">
           </label>
         </div>
         <div class="grid two">
@@ -395,6 +406,8 @@ export function dashboardHtml(): string {
         <div class="actions">
           <button type="button" id="execute">Execute</button>
           <button type="button" id="prepare" class="secondary">Prepare</button>
+          <button type="button" id="objectPlan" class="secondary">Object Plan</button>
+          <button type="button" id="objectExecute" class="secondary">Object Execute</button>
           <button type="button" id="probe" class="secondary">Probe Illustrator</button>
           <button type="button" id="ping" class="ghost">Ping Job</button>
         </div>
@@ -445,9 +458,11 @@ export function dashboardHtml(): string {
         format: String(data.get("format") || "png"),
         platform: String(data.get("platform") || "auto"),
         method: String(data.get("method") || "auto"),
+        runMode: String(data.get("runMode") || "launch"),
         width: numberValue(data, "width"),
         height: numberValue(data, "height"),
         minNonBlankRatio: numberValue(data, "minNonBlankRatio"),
+        maxGuardIterations: numberValue(data, "maxGuardIterations"),
         dryRun: data.has("dryRun"),
         waitForResults: data.has("waitForResults"),
         skipQa: data.has("skipQa"),
@@ -477,7 +492,7 @@ export function dashboardHtml(): string {
 
     function show(value) {
       result.textContent = JSON.stringify(value, null, 2);
-      renderQa(value.exportQa || value.report);
+      renderQa(value.exportQa || value.report || (value.workflow && value.workflow.plan && value.workflow.plan.guard) || (value.plan && (value.plan.guard || value.plan.qa)) || value.guard);
       renderJobs(value);
     }
 
@@ -549,6 +564,48 @@ export function dashboardHtml(): string {
             model: body.model,
             width: body.width,
             height: body.height
+          })
+        }));
+      } catch (error) {
+        show({ ok: false, error: String(error.message || error) });
+      }
+    });
+
+    document.querySelector("#objectPlan").addEventListener("click", async () => {
+      try {
+        const body = payload();
+        show(await api("/v1/object-shapes/plan", {
+          method: "POST",
+          body: JSON.stringify({
+            prompt: body.prompt,
+            width: body.width,
+            height: body.height
+          })
+        }));
+      } catch (error) {
+        show({ ok: false, error: String(error.message || error) });
+      }
+    });
+
+    document.querySelector("#objectExecute").addEventListener("click", async () => {
+      try {
+        const body = payload();
+        show(await api("/v1/workflows/object/execute", {
+          method: "POST",
+          body: JSON.stringify({
+            prompt: body.prompt,
+            outputPath: body.outputPath,
+            format: body.format,
+            platform: body.platform,
+            runMode: body.runMode,
+            appPath: body.appPath,
+            width: body.width,
+            height: body.height,
+            maxGuardIterations: body.maxGuardIterations,
+            dryRun: body.dryRun,
+            waitForResults: body.waitForResults,
+            skipQa: body.skipQa,
+            minNonBlankRatio: body.minNonBlankRatio
           })
         }));
       } catch (error) {

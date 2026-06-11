@@ -30,7 +30,7 @@ export interface SceneDocument {
   colorMode?: "RGB" | "CMYK";
 }
 
-export type SceneElement = RectElement | EllipseElement | TextElement | LineElement | PolygonElement;
+export type SceneElement = RectElement | EllipseElement | TextElement | LineElement | PolygonElement | PathElement;
 
 export interface BaseElement {
   name?: string;
@@ -69,9 +69,23 @@ export interface PolygonElement extends BaseElement {
   points: Point[];
 }
 
+export interface PathElement extends BaseElement {
+  type: "path";
+  points: PathPoint[];
+  closed?: boolean;
+}
+
 export interface Point {
   x: number;
   y: number;
+}
+
+export interface PathPoint extends Point {
+  leftX?: number;
+  leftY?: number;
+  rightX?: number;
+  rightY?: number;
+  pointType?: "corner" | "smooth";
 }
 
 export interface ElementStyle {

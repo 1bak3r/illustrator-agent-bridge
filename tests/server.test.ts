@@ -40,6 +40,18 @@ test("HTTP bridge creates a JSX job", async () => {
     assert.equal(launchBody.dryRun, true);
     assert.equal(launchBody.command.command, "open");
 
+    const runCom = await fetch(`${server.url}/v1/jobs/${body.job.id}/run-com`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dryRun: true, platform: "wsl" })
+    });
+    assert.equal(runCom.status, 200);
+    const runComBody = (await runCom.json()) as { ok: boolean; dryRun: boolean; command: { command: string; args: string[] } };
+    assert.equal(runComBody.ok, true);
+    assert.equal(runComBody.dryRun, true);
+    assert.equal(runComBody.command.command, "powershell.exe");
+    assert.ok(runComBody.command.args.includes("-EncodedCommand"));
+
     const status = await fetch(`${server.url}/v1/jobs/${body.job.id}/status`);
     assert.equal(status.status, 200);
     const statusBody = (await status.json()) as { ok: boolean; job: { exists: boolean } };
@@ -101,6 +113,179 @@ test("HTTP bridge probes Illustrator communication in dry-run mode", async () =>
   }
 });
 
+test("HTTP bridge searches semantic scientific concepts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-semantic-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/semantic/search`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        query: "electron transfer charge flow",
+        kind: "scientific_concept",
+        limit: 3
+      })
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      ok: boolean;
+      resultCount: number;
+      results: Array<{ item: { kind: string; id: string } }>;
+    };
+    assert.equal(body.ok, true);
+    assert.ok(body.resultCount > 0);
+    assert.equal(body.results[0]?.item.kind, "scientific_concept");
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge inspects vector files as shape-combination evidence", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-vector-"));
+  const server = await startBridgeServer({ port: 0, root });
+  const svgPath = join(root, "http-key.svg");
+  await writeFile(svgPath, `<svg><ellipse id="key-bow"/><rect id="key-shaft"/><rect id="key-tooth"/></svg>`, "utf8");
+
+  try {
+    const response = await fetch(`${server.url}/v1/semantic/inspect-vector`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        paths: [svgPath]
+      })
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      ok: boolean;
+      profileCount: number;
+      items: Array<{ kind: string; text: string; tags: string[] }>;
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.profileCount, 1);
+    assert.equal(body.items[0]?.kind, "shape_combination");
+    assert.ok(body.items[0]?.tags.includes("key"));
+    assert.match(body.items[0]?.text ?? "", /key-shaft/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge plans a scientific concept scene", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-science-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/scientific/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "polymer membrane electron transfer catalytic concept",
+        width: 960,
+        height: 640
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      plan: { qa: { ok: boolean }; evidence: unknown[]; scene: { elements: unknown[] } };
+      job: { jobPath: string };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.plan.qa.ok, true);
+    assert.ok(body.plan.evidence.length > 0);
+    assert.ok(body.plan.scene.elements.length > 30);
+    await access(body.job.jobPath);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge plans and guards an object shape scene", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-object-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/object-shapes/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "full cat icon",
+        width: 720,
+        height: 520
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      plan: { target: string; guard: { ok: boolean; nextPrompt: string | null }; scene: unknown };
+      job: { jobPath: string };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.plan.target, "cat");
+    assert.equal(body.plan.guard.ok, true);
+    assert.equal(body.plan.guard.nextPrompt, null);
+    await access(body.job.jobPath);
+
+    const guardResponse = await fetch(`${server.url}/v1/object-shapes/guard`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        target: "cat",
+        scene: body.plan.scene,
+        prompt: "full cat icon"
+      })
+    });
+
+    assert.equal(guardResponse.status, 200);
+    const guardBody = (await guardResponse.json()) as { ok: boolean; guard: { nextPrompt: string | null } };
+    assert.equal(guardBody.ok, true);
+    assert.equal(guardBody.guard.nextPrompt, null);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge exposes Illustrator mouse dry-run automation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-mouse-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/illustrator/mouse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        platform: "wsl",
+        action: "drag",
+        x: 0.35,
+        y: 0.5,
+        toX: 0.65,
+        toY: 0.5,
+        dryRun: true
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      action: string;
+      stdout: string;
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.action, "dry-run");
+    assert.match(body.stdout, /AgentBridgeMouse/);
+    assert.match(body.stdout, /mouse_event/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("HTTP bridge prepares a cartoon workflow", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-workflow-"));
   const server = await startBridgeServer({ port: 0, root });
@@ -128,6 +313,44 @@ test("HTTP bridge prepares a cartoon workflow", async () => {
     assert.equal(body.ok, true);
     assert.equal(body.plan.planner, "deterministic");
     assert.equal(body.runbook.length, 4);
+    await access(body.sceneJob.jobPath);
+    await access(body.exportJob.jobPath);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge prepares an object shape workflow", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-object-workflow-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/object`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "secure padlock icon",
+        outputPath: "var/exports/http-object-lock.svg",
+        format: "svg",
+        maxGuardIterations: 3
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      plan: { target: string; guard: { ok: boolean } };
+      guardIterations: Array<{ guardOk: boolean }>;
+      sceneJob: { jobPath: string };
+      exportJob: { jobPath: string };
+      runbook: unknown[];
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.plan.target, "lock");
+    assert.equal(body.plan.guard.ok, true);
+    assert.equal(body.guardIterations.length, 1);
+    assert.equal(body.guardIterations[0]?.guardOk, true);
+    assert.equal(body.runbook.length, 5);
     await access(body.sceneJob.jobPath);
     await access(body.exportJob.jobPath);
   } finally {
@@ -163,6 +386,48 @@ test("HTTP bridge executes a cartoon workflow dry-run", async () => {
     assert.equal(body.dryRun, true);
     assert.equal(body.sceneLaunch.dryRun, true);
     assert.equal(body.exportLaunch.dryRun, true);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge executes an object workflow dry-run through COM mode", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-object-execute-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/object/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "simple house key icon",
+        outputPath: "var/exports/http-object-key.png",
+        format: "png",
+        platform: "wsl",
+        runMode: "com",
+        maxGuardIterations: 3,
+        dryRun: true
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      runMode: string;
+      workflow: { plan: { target: string; guard: { ok: boolean } }; guardIterations: Array<{ guardOk: boolean }> };
+      sceneLaunch: { command: { command: string } };
+      exportLaunch: { command: { command: string } };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.runMode, "com");
+    assert.equal(body.workflow.plan.target, "key");
+    assert.equal(body.workflow.plan.guard.ok, true);
+    assert.equal(body.workflow.guardIterations.length, 1);
+    assert.equal(body.workflow.guardIterations[0]?.guardOk, true);
+    assert.equal(body.sceneLaunch.command.command, "powershell.exe");
+    assert.equal(body.exportLaunch.command.command, "powershell.exe");
   } finally {
     await server.close();
   }

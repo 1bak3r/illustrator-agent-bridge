@@ -20,7 +20,10 @@
 6. ExtendScript job connector
    Emits self-contained `.jsx` scripts for regular Illustrator, executes them through Windows COM when available, asks the desktop to open them when configured, and reads JSON results so the caller can confirm execution.
 
-7. Semantic search layer
+7. UI/mouse automation connector
+   Uses Windows user32 from PowerShell to restore/focus Illustrator, measure the live window, and move/click/drag the actual mouse relative to that measured window. This path is for proof and UI-only gaps, not the primary drawing API.
+
+8. Semantic search layer
    Planned retrieval layer for visual references, object semantics, style guides, and publication constraints. Retrieval should feed the planning step before commands are sent to Illustrator.
 
 ## Command Flow
@@ -43,6 +46,12 @@ Windows/WSL COM fallback:
 LLM/browser agent -> bridge HTTP/CLI/MCP -> generated .jsx -> Illustrator.Application.DoJavaScriptFile -> active Illustrator document -> result JSON
 ```
 
+Scientific concept planning:
+
+```text
+Prompt -> semantic query expansion -> scientific_concept / visual_metaphor / publication retrieval -> concept modules -> validated scene JSX -> job:run-com / bridge_run_job_via_com -> result JSON
+```
+
 Agent-facing MCP:
 
 ```text
@@ -61,6 +70,12 @@ No-key communication proof:
 illustrator:probe --method com --draw-circle --wait -> generated circle JSX -> Illustrator COM -> circle path item in active document -> result JSON ok=true
 ```
 
+Complex shape plus mouse proof:
+
+```text
+illustrator:probe --method com --draw-complex --wait --mouse-proof -> generated Bezier/path scene -> Illustrator COM -> measured Illustrator window -> actual mouse click/drag -> result JSON and mouseProof.ok=true
+```
+
 Cartoon fallback:
 
 ```text
@@ -76,7 +91,7 @@ execute_cartoon_publication_workflow / workflow:execute-cartoon -> prepare workf
 ## Near-Term Milestones
 
 1. Prove native MCP discovery with `mcp:list-tools` on a machine running Illustrator Beta.
-2. Add a small vocabulary of high-level vector commands: create document, create named layer, draw styled shapes, edit text, export PDF/SVG/PNG. The bridge now proves create-document plus circle drawing through Illustrator COM on Windows/WSL.
-3. Add semantic retrieval for "what is this object/style?" before generating scene plans.
+2. Add a small vocabulary of high-level vector commands: create document, create named layer, draw styled shapes, edit text, export PDF/SVG/PNG. The bridge now proves create-document plus circle drawing, complex Bezier paths, and measured mouse control through Windows/WSL.
+3. Add semantic retrieval for "what is this object/style?" before generating scene plans. The bridge now includes scientific concept and visual metaphor retrieval for complex concept scenes.
 4. Add visual QA: export a PNG, inspect dimensions/nonblank pixels, and iterate before declaring artwork done. The bridge now performs PNG nonblank pixel checks; iteration is the next layer.
 5. Expand the optional OpenAI planner with stronger art-direction prompts, regression examples, and visual iteration. The first LLM path now emits the same validated scene contract as the deterministic planner.

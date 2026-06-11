@@ -1,17 +1,27 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { runJsxViaIllustratorCom } from "./comAutomation.js";
 import { dashboardHtml } from "./dashboard.js";
 import { createGeneratedJob } from "./jobs.js";
 import { getGeneratedJobPaths, resolveBridgeRoot } from "./files.js";
 import { detectIllustratorApps, probeIllustratorCommunication, type IllustratorProbeMethod } from "./illustratorProbe.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
-import { LaunchJobError, launchJsxJob, type LaunchPlatform } from "./launcher.js";
+import { LaunchJobError, launchJsxJob, resolveLaunchPlatform, type LaunchPlatform } from "./launcher.js";
+import { driveIllustratorMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./mouseAutomation.js";
 import { JobResultError, normalizeJobId, readJobStatus } from "./results.js";
-import { normalizeCommand, ValidationError } from "./validation.js";
+import { normalizeCommand, normalizeScene, ValidationError } from "./validation.js";
 import { OpenAiPlannerError } from "../planner/openAiCartoonPlanner.js";
+import { ObjectShapePlannerError, parseObjectShapeTarget, planObjectShapeScene } from "../planner/objectShapePlanner.js";
 import type { PlannerMode } from "../planner/plannerRouter.js";
+import { planScientificConceptScene } from "../planner/scientificConceptPlanner.js";
 import { ExportQaError, inspectExportArtifact } from "../qa/exportQa.js";
+import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
+import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
+import type { SemanticKind } from "../semantic/types.js";
+import { inspectVectorShapeFiles } from "../semantic/vectorShapeIngest.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
+import { executeObjectShapeWorkflow, type ObjectWorkflowRunMode } from "../workflow/objectExecutor.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
+import { prepareObjectShapeWorkflow } from "../workflow/objectWorkflow.js";
 
 export interface ServerOptions {
   host?: string;
@@ -86,12 +96,72 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       waitForResult: optionalBooleanBodyValue(body.waitForResult, "waitForResult"),
       autoConfirmDialog: optionalBooleanBodyValue(body.autoConfirmDialog, "autoConfirmDialog"),
       drawCircle: optionalBooleanBodyValue(body.drawCircle, "drawCircle"),
+      drawComplex: optionalBooleanBodyValue(body.drawComplex, "drawComplex"),
+      mouseProof: optionalBooleanBodyValue(body.mouseProof, "mouseProof"),
+      mouseAction: optionalMouseAction(body.mouseAction),
+      mouseX: optionalNumberBodyValue(body.mouseX, "mouseX"),
+      mouseY: optionalNumberBodyValue(body.mouseY, "mouseY"),
+      mouseToX: optionalNumberBodyValue(body.mouseToX, "mouseToX"),
+      mouseToY: optionalNumberBodyValue(body.mouseToY, "mouseToY"),
+      mouseDurationMs: optionalNumberBodyValue(body.mouseDurationMs, "mouseDurationMs"),
+      mouseWindowTitlePattern: optionalStringBodyValue(body.mouseWindowTitlePattern, "mouseWindowTitlePattern"),
       timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
       dialogTimeoutMs: optionalNumberBodyValue(body.dialogTimeoutMs, "dialogTimeoutMs"),
       intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
       root
     });
     writeJson(response, 201, result);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/illustrator/mouse") {
+    const body = objectBody(await readOptionalJson(request));
+    const result = await driveIllustratorMouse({
+      platform: resolveLaunchPlatform(optionalLaunchPlatform(body.platform)),
+      action: optionalMouseAction(body.action),
+      button: optionalMouseButton(body.button),
+      relativeX: optionalNumberBodyValue(body.x, "x"),
+      relativeY: optionalNumberBodyValue(body.y, "y"),
+      endRelativeX: optionalNumberBodyValue(body.toX, "toX"),
+      endRelativeY: optionalNumberBodyValue(body.toY, "toY"),
+      durationMs: optionalNumberBodyValue(body.durationMs, "durationMs"),
+      windowTitlePattern: optionalStringBodyValue(body.windowTitlePattern, "windowTitlePattern"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun")
+    });
+    writeJson(response, 201, result);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/semantic/search") {
+    const body = objectBody(await readJson(request));
+    const query = stringBodyValue(body.query, "query");
+    const limit = optionalNumberBodyValue(body.limit, "limit");
+    const kind = optionalSemanticKind(body.kind);
+    const corpus = await loadDefaultCorpus();
+    const results = searchCorpus(query, corpus, { limit, kind });
+    writeJson(response, 200, {
+      ok: true,
+      query,
+      kind,
+      resultCount: results.length,
+      results
+    });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/semantic/inspect-vector") {
+    const body = objectBody(await readJson(request));
+    const paths = stringArrayBodyValue(body.paths, "paths");
+    const profiles = await inspectVectorShapeFiles(paths, {
+      limit: optionalNumberBodyValue(body.limit, "limit")
+    });
+    writeJson(response, 200, {
+      ok: true,
+      inputCount: paths.length,
+      profileCount: profiles.length,
+      profiles,
+      items: profiles.map((profile) => profile.item)
+    });
     return;
   }
 
@@ -112,6 +182,65 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
     return;
   }
 
+  if (method === "POST" && url.pathname === "/v1/scientific/plan") {
+    const body = objectBody(await readJson(request));
+    const prompt = stringBodyValue(body.prompt, "prompt");
+    const corpus = await loadDefaultCorpus();
+    const plan = planScientificConceptScene(prompt, corpus, {
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      evidenceLimit: optionalNumberBodyValue(body.evidenceLimit, "evidenceLimit")
+    });
+    const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, root);
+    writeJson(response, 201, {
+      ok: true,
+      plan,
+      job: generatedJobSummary(job),
+      run: {
+        illustratorMenu: "File > Scripts > Other Script",
+        scriptPath: job.illustratorJobPath,
+        resultPath: job.resultPath,
+        illustratorResultPath: job.illustratorResultPath
+      }
+    });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/object-shapes/plan") {
+    const body = objectBody(await readJson(request));
+    const prompt = stringBodyValue(body.prompt, "prompt");
+    const corpus = await loadDefaultCorpus();
+    const plan = planObjectShapeScene(prompt, corpus, {
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      evidenceLimit: optionalNumberBodyValue(body.evidenceLimit, "evidenceLimit")
+    });
+    const job = await createGeneratedJob({ kind: "cartoon_scene", scene: plan.scene }, root);
+    writeJson(response, 201, {
+      ok: true,
+      plan,
+      job: generatedJobSummary(job),
+      run: {
+        illustratorMenu: "File > Scripts > Other Script",
+        scriptPath: job.illustratorJobPath,
+        resultPath: job.resultPath,
+        illustratorResultPath: job.illustratorResultPath
+      }
+    });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/object-shapes/guard") {
+    const body = objectBody(await readJson(request));
+    const target = parseObjectShapeTarget(stringBodyValue(body.target, "target"));
+    const scene = normalizeScene(body.scene);
+    const guard = guardObjectShapeScene(target, scene, optionalStringBodyValue(body.prompt, "prompt"));
+    writeJson(response, 200, { ok: guard.ok, guard });
+    return;
+  }
+
   if (method === "POST" && url.pathname.startsWith("/v1/jobs/") && url.pathname.endsWith("/launch")) {
     const id = normalizeJobId(url.pathname.split("/")[3] ?? "");
     const body = objectBody(await readOptionalJson(request));
@@ -119,6 +248,20 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
     const result = await launchJsxJob(jobPath, {
       platform: optionalLaunchPlatform(body.platform),
       appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      root
+    });
+
+    writeJson(response, 200, result);
+    return;
+  }
+
+  if (method === "POST" && url.pathname.startsWith("/v1/jobs/") && url.pathname.endsWith("/run-com")) {
+    const id = normalizeJobId(url.pathname.split("/")[3] ?? "");
+    const body = objectBody(await readOptionalJson(request));
+    const { jobPath } = await getGeneratedJobPaths(id, root);
+    const result = await runJsxViaIllustratorCom(jobPath, {
+      platform: resolveLaunchPlatform(optionalLaunchPlatform(body.platform)),
       dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
       root
     });
@@ -159,6 +302,53 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       openAiModel: optionalStringBodyValue(body.model, "model"),
       launchPlatform: optionalLaunchPlatform(body.platform),
       appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      waitForResults: optionalBooleanBodyValue(body.waitForResults, "waitForResults"),
+      timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
+      intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
+      skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio"),
+      root
+    });
+
+    writeJson(response, 201, execution);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/object") {
+    const body = objectBody(await readJson(request));
+    const workflow = await prepareObjectShapeWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      format: optionalExportFormat(body.format),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      evidenceLimit: optionalNumberBodyValue(body.evidenceLimit, "evidenceLimit"),
+      maxGuardIterations: optionalNumberBodyValue(body.maxGuardIterations, "maxGuardIterations"),
+      root
+    });
+    writeJson(response, 201, workflow);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/object/execute") {
+    const body = objectBody(await readJson(request));
+    const execution = await executeObjectShapeWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      format: optionalExportFormat(body.format),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      evidenceLimit: optionalNumberBodyValue(body.evidenceLimit, "evidenceLimit"),
+      maxGuardIterations: optionalNumberBodyValue(body.maxGuardIterations, "maxGuardIterations"),
+      launchPlatform: optionalLaunchPlatform(body.platform),
+      appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      runMode: optionalObjectWorkflowRunMode(body.runMode),
       dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
       waitForResults: optionalBooleanBodyValue(body.waitForResults, "waitForResults"),
       timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
@@ -267,7 +457,8 @@ function statusForError(error: unknown): number {
     error instanceof JobResultError ||
     error instanceof ExportQaError ||
     error instanceof LaunchJobError ||
-    error instanceof OpenAiPlannerError
+    error instanceof OpenAiPlannerError ||
+    error instanceof ObjectShapePlannerError
   ) {
     return 400;
   }
@@ -372,6 +563,19 @@ function optionalPlannerMode(input: unknown): PlannerMode | undefined {
   return value;
 }
 
+function optionalObjectWorkflowRunMode(input: unknown): ObjectWorkflowRunMode | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "runMode").toLowerCase();
+  if (value !== "launch" && value !== "com") {
+    throw new ValidationError("runMode must be launch or com");
+  }
+
+  return value;
+}
+
 function optionalProbeMethod(input: unknown): IllustratorProbeMethod | undefined {
   if (input === undefined) {
     return undefined;
@@ -380,6 +584,69 @@ function optionalProbeMethod(input: unknown): IllustratorProbeMethod | undefined
   const value = stringBodyValue(input, "method").toLowerCase();
   if (value !== "auto" && value !== "desktop" && value !== "com") {
     throw new ValidationError("method must be auto, desktop, or com");
+  }
+
+  return value;
+}
+
+function optionalSemanticKind(input: unknown): SemanticKind | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "kind").toLowerCase();
+  if (
+    value !== "object_semantics" &&
+    value !== "shape_recipe" &&
+    value !== "shape_combination" &&
+    value !== "scientific_concept" &&
+    value !== "visual_metaphor" &&
+    value !== "style_reference" &&
+    value !== "publication_requirement" &&
+    value !== "document_state" &&
+    value !== "illustrator_capability"
+  ) {
+    throw new ValidationError("kind is not supported");
+  }
+
+  return value;
+}
+
+function stringArrayBodyValue(input: unknown, name: string): string[] {
+  if (!Array.isArray(input) || input.length === 0) {
+    throw new ValidationError(`${name} must be a non-empty string array`);
+  }
+
+  return input.map((value, index) => {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new ValidationError(`${name}[${index}] must be a non-empty string`);
+    }
+
+    return value;
+  });
+}
+
+function optionalMouseAction(input: unknown): IllustratorMouseAction | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "action").toLowerCase();
+  if (value !== "move" && value !== "click" && value !== "double-click" && value !== "drag") {
+    throw new ValidationError("action must be move, click, double-click, or drag");
+  }
+
+  return value;
+}
+
+function optionalMouseButton(input: unknown): IllustratorMouseButton | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "button").toLowerCase();
+  if (value !== "left" && value !== "right") {
+    throw new ValidationError("button must be left or right");
   }
 
   return value;

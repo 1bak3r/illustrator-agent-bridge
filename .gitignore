@@ -5,6 +5,7 @@ dist/
 var/jobs/*
 var/results/*
 var/exports/*
+var/drive-vector-search/
 !var/.gitkeep
 !var/jobs/.gitkeep
 !var/results/.gitkeep
