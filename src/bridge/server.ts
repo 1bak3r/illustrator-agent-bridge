@@ -13,6 +13,7 @@ import { OpenAiPlannerError } from "../planner/openAiCartoonPlanner.js";
 import { ObjectShapePlannerError, parseObjectShapeTarget, planObjectShapeScene } from "../planner/objectShapePlanner.js";
 import type { PlannerMode } from "../planner/plannerRouter.js";
 import { planScientificConceptScene } from "../planner/scientificConceptPlanner.js";
+import { reviewArtworkQuality } from "../qa/artworkReviewGuard.js";
 import { ExportQaError, inspectExportArtifact } from "../qa/exportQa.js";
 import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
@@ -307,6 +308,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
       intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
       skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      skipArtworkReview: optionalBooleanBodyValue(body.skipArtworkReview, "skipArtworkReview"),
       minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
       minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
       minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
@@ -354,6 +356,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
       intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
       skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      skipArtworkReview: optionalBooleanBodyValue(body.skipArtworkReview, "skipArtworkReview"),
       minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
       minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
       minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
@@ -375,6 +378,27 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio")
     });
     writeJson(response, 200, { ok: report.ok, report });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/qa/artwork") {
+    const body = objectBody(await readJson(request));
+    const exportQa = await inspectExportArtifact(stringBodyValue(body.path, "path"), {
+      format: optionalExportFormat(body.format),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio")
+    });
+    const scene = body.scene === undefined ? undefined : normalizeScene(sceneFromJson(body.scene));
+    const review = reviewArtworkQuality({
+      prompt: optionalStringBodyValue(body.prompt, "prompt") ?? "review exported Illustrator artwork",
+      scene,
+      exportQa,
+      target: optionalStringBodyValue(body.target, "target")
+    });
+
+    writeJson(response, 200, { ok: exportQa.ok && review.ok, exportQa, review });
     return;
   }
 
@@ -634,6 +658,24 @@ function optionalMouseAction(input: unknown): IllustratorMouseAction | undefined
   const value = stringBodyValue(input, "action").toLowerCase();
   if (value !== "move" && value !== "click" && value !== "double-click" && value !== "drag") {
     throw new ValidationError("action must be move, click, double-click, or drag");
+  }
+
+  return value;
+}
+
+function sceneFromJson(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  const plan = record.plan;
+  if (typeof plan === "object" && plan !== null && !Array.isArray(plan) && "scene" in plan) {
+    return (plan as Record<string, unknown>).scene;
+  }
+
+  if ("scene" in record) {
+    return record.scene;
   }
 
   return value;

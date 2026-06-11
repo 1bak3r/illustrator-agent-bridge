@@ -5,7 +5,7 @@ Early bridge for connecting an LLM or browser agent to Adobe Illustrator, with t
 - Native Illustrator Beta MCP: preferred when the latest Illustrator Beta MCP server is available.
 - ExtendScript job files: fallback for regular Illustrator installs and for deterministic vector-art generation.
 
-The first practical goal is communication, not autonomous art direction. The bridge can discover/call Illustrator MCP tools, or generate `.jsx` jobs that Illustrator can run and report back through a JSON result file.
+The first practical goal is reliable communication plus bounded iterative artwork refinement. The bridge can discover/call Illustrator MCP tools, or generate `.jsx` jobs that Illustrator can run and report back through a JSON result file.
 
 ## Current Status
 
@@ -18,6 +18,7 @@ The bridge has proven no-key Illustrator control on Windows Illustrator from WSL
 - Can drive the actual Windows mouse against the live Illustrator window from WSL/Windows after measuring and focusing the target window.
 - Uses local semantic search to retrieve scientific concepts, visual metaphors, object semantics, and publication constraints before planning complex concept figures.
 - Uses shape recipes for concrete objects such as cats, locks, and keys, then runs a local guard that returns a refinement prompt when recognizable parts, spatial grammar, or visual footprint checks fail.
+- Runs post-export artwork review that combines export QA, vector/pixel checks, scene composition checks, label-reliance checks, and `nextGoalPrompt` output for the next refinement pass.
 - Can inspect reviewed SVG, AI, EPS, PDF, or saved bridge scene JSON files and convert detected vector shape combinations into searchable `shape_combination` semantic evidence.
 - Reads Illustrator's result JSON back from `var/results/`.
 - Exposes the same probe through CLI, HTTP dashboard, and MCP tools for an agent/browser workflow.
@@ -51,6 +52,7 @@ npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner auto
 npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
 npm run workflow:execute-cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.svg --format svg --dry-run
 npm run workflow:execute-object -- "full cat icon" --output ./var/exports/cat.png --format png --run-mode com --platform wsl --dry-run
+node dist/src/cli.js qa:artwork ./var/exports/cat.png --format png --prompt "full cat icon" --target cat
 ```
 
 Optional LLM planning uses the OpenAI Responses API with Structured Outputs, then validates the returned scene through the same bridge contract before writing JSX:
@@ -108,6 +110,14 @@ Run structural and PNG visual QA on the exported file:
 node dist/src/cli.js qa:export ./var/exports/figure.png --format png --min-width 360 --min-height 240 --min-nonblank-ratio 0.001
 ```
 
+Run the higher-level artwork review guard after export QA when a scene plan is available:
+
+```bash
+node dist/src/cli.js qa:artwork ./var/exports/figure.svg --format svg --scene ./saved-plan-output.json --prompt "cartoon lab scientist with flask"
+```
+
+`qa:artwork` accepts raw scene JSON or full plan/workflow JSON. It returns `review.ok`, `review.issues`, `review.improvements`, and `review.nextGoalPrompt`. Feed `review.nextGoalPrompt` into the next planning or workflow call when the export is too sparse, too small, cropped, overly text-driven, missing named editable parts, or otherwise likely to fail visual acceptance.
+
 Plan and execute a complex scientific concept scene:
 
 ```bash
@@ -140,6 +150,8 @@ npm run workflow:execute-object -- "secure padlock icon" --output ./var/exports/
 ```
 
 `workflow:execute-object` can run a bounded guard refinement loop before Illustrator execution. Pass `--max-guard-iterations 3` so each failed guard attempt feeds `workflow.plan.guard.nextGoalPrompt` into the next object-planning pass until the guard passes or the limit is reached. If the final guard still fails, the workflow stops before Illustrator execution and returns the final `nextGoalPrompt`. With `--run-mode com` on Windows/WSL, it runs the scene and export jobs sequentially through Illustrator COM; with default `--run-mode launch`, it uses the regular desktop launch path.
+
+When an execute workflow waits for Illustrator results and export QA is enabled, it also runs the artwork review guard and includes `artworkReview` in the response. If `artworkReview.ok` is false, `next` contains `artworkReview.nextGoalPrompt` so the agent can revise the Illustrator scene instead of accepting the first export. Pass `--skip-review` only when you intentionally want raw export QA without composition/recognizability review.
 
 Inspect reviewed vector assets and turn their shape combinations into searchable evidence:
 
@@ -218,6 +230,7 @@ Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job
 Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.
 Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
 Use `qa_export_artifact` after export to check file size, format signature, dimensions, SVG/PDF structure, and PNG nonblank pixel content.
+Use `review_artwork_quality` after export when an agent needs a semantic visual critique and `review.nextGoalPrompt` for the next revision pass.
 
 The planner defaults to `deterministic`. Set `--planner auto` or pass `planner: "auto"` to use the OpenAI planner when `OPENAI_API_KEY` is configured, with deterministic fallback when it is not. Set `--planner openai` to require OpenAI planning. `OPENAI_MODEL` defaults to `gpt-5.5`, and `OPENAI_BASE_URL` defaults to `https://api.openai.com/v1`. The dashboard exposes the same planner and model controls.
 
@@ -243,6 +256,14 @@ Execute a cartoon workflow dry-run over HTTP:
 curl -sS http://127.0.0.1:4317/v1/workflows/cartoon/execute \
   -H 'content-type: application/json' \
   -d '{"prompt":"cartoon lab scientist with flask","outputPath":"var/exports/figure.svg","format":"svg","dryRun":true,"platform":"macos"}'
+```
+
+Review an exported artifact over HTTP:
+
+```bash
+curl -sS http://127.0.0.1:4317/v1/qa/artwork \
+  -H 'content-type: application/json' \
+  -d '{"path":"var/exports/figure.svg","format":"svg","prompt":"cartoon lab scientist with flask","scene":{"elements":[{"type":"rect","name":"main-shape","x":120,"y":120,"width":360,"height":240,"style":{"fill":"#88c0d0","stroke":"#2e3440","strokeWidth":4}}]}}'
 ```
 
 ## Why This Shape

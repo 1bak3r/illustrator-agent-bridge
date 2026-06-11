@@ -38,6 +38,7 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_get_job_status"));
     assert.ok(listed.tools.some((tool) => tool.name === "bridge_wait_for_job_result"));
     assert.ok(listed.tools.some((tool) => tool.name === "qa_export_artifact"));
+    assert.ok(listed.tools.some((tool) => tool.name === "review_artwork_quality"));
 
     const searchResult = await client.callTool({
       name: "semantic_search_visual_knowledge",
@@ -278,6 +279,29 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     const qaContent = qaResult.content as Array<{ type: string; text?: string }>;
     const qaBody = JSON.parse(qaContent[0]?.text ?? "");
     assert.equal(qaBody.ok, true);
+
+    const artworkReviewResult = await client.callTool({
+      name: "review_artwork_quality",
+      arguments: {
+        path: exportSvgPath,
+        prompt: "full cat icon",
+        target: "cat",
+        minBytes: 1,
+        scene: {
+          document: { width: 720, height: 480 },
+          elements: [
+            { type: "rect", name: "background", x: 0, y: 0, width: 720, height: 480, style: { fill: "#ffffff", stroke: null } },
+            { type: "text", name: "cat-label", x: 320, y: 250, text: "cat", size: 42, style: { fill: "#111111", stroke: null } }
+          ]
+        }
+      }
+    });
+    const artworkReviewContent = artworkReviewResult.content as Array<{ type: string; text?: string }>;
+    const artworkReviewBody = JSON.parse(artworkReviewContent[0]?.text ?? "");
+    assert.equal(artworkReviewBody.ok, false);
+    assert.equal(artworkReviewBody.exportQa.ok, true);
+    assert.equal(artworkReviewBody.review.ok, false);
+    assert.match(artworkReviewBody.review.nextGoalPrompt, /Make the cat recognizable/);
   } finally {
     await client.close();
     await server.close();

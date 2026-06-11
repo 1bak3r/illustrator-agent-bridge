@@ -16,6 +16,7 @@ import { OpenAiPlannerError } from "./planner/openAiCartoonPlanner.js";
 import { ObjectShapePlannerError, parseObjectShapeTarget, planObjectShapeScene } from "./planner/objectShapePlanner.js";
 import { planCartoonSceneWithMode, type PlannerMode } from "./planner/plannerRouter.js";
 import { ExportQaError, inspectExportArtifact } from "./qa/exportQa.js";
+import { reviewArtworkQuality } from "./qa/artworkReviewGuard.js";
 import { guardObjectShapeScene } from "./qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "./semantic/search.js";
 import { executeCartoonWorkflow } from "./workflow/cartoonExecutor.js";
@@ -95,6 +96,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "qa:export":
       await qaExport(rest);
+      return;
+    case "qa:artwork":
+      await qaArtwork(rest);
       return;
     case "serve":
       await serve(rest);
@@ -415,6 +419,33 @@ async function qaExport(args: string[]): Promise<void> {
   console.log(JSON.stringify({ ok: report.ok, report }, null, 2));
 }
 
+async function qaArtwork(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const path = options.positionals[0];
+
+  if (!path) {
+    throw new ValidationError("qa:artwork requires an export artifact path");
+  }
+
+  const exportQa = await inspectExportArtifact(path, {
+    format: optionalExportFormat(optionValue(options, "format")),
+    minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
+    minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
+    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
+    minNonBlankRatio: optionValue(options, "min-nonblank-ratio") ? Number(optionValue(options, "min-nonblank-ratio")) : undefined
+  });
+  const scenePath = optionValue(options, "scene");
+  const scene = scenePath ? normalizeScene(sceneFromJson(await readJsonFile(scenePath))) : undefined;
+  const review = reviewArtworkQuality({
+    prompt: optionValue(options, "prompt") ?? "review exported Illustrator artwork",
+    scene,
+    exportQa,
+    target: optionValue(options, "target")
+  });
+
+  console.log(JSON.stringify({ ok: exportQa.ok && review.ok, exportQa, review }, null, 2));
+}
+
 async function planCartoon(args: string[]): Promise<void> {
   const options = parseOptions(args);
   const prompt = options.positionals.join(" ");
@@ -581,6 +612,7 @@ async function workflowExecuteCartoon(args: string[]): Promise<void> {
     timeoutMs: optionValue(options, "timeout-ms") ? Number(optionValue(options, "timeout-ms")) : undefined,
     intervalMs: optionValue(options, "interval-ms") ? Number(optionValue(options, "interval-ms")) : undefined,
     skipQa: flagValue(options, "skip-qa"),
+    skipArtworkReview: flagValue(options, "skip-review"),
     minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
     minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
     minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
@@ -654,6 +686,7 @@ async function workflowExecuteObject(args: string[]): Promise<void> {
     timeoutMs: optionValue(options, "timeout-ms") ? Number(optionValue(options, "timeout-ms")) : undefined,
     intervalMs: optionValue(options, "interval-ms") ? Number(optionValue(options, "interval-ms")) : undefined,
     skipQa: flagValue(options, "skip-qa"),
+    skipArtworkReview: flagValue(options, "skip-review"),
     minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
     minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
     minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
@@ -669,7 +702,7 @@ interface ParsedOptions {
   flags: Set<string>;
 }
 
-const flagOptions = new Set(["dry-run", "no-wait", "skip-qa", "wait", "auto-confirm-dialog", "draw-circle", "draw-complex", "mouse-proof"]);
+const flagOptions = new Set(["dry-run", "no-wait", "skip-qa", "skip-review", "wait", "auto-confirm-dialog", "draw-circle", "draw-complex", "mouse-proof"]);
 
 function parseOptions(args: string[]): ParsedOptions {
   const positionals: string[] = [];
@@ -785,14 +818,15 @@ Commands:
   plan:object PROMPT [--width N] [--height N] [--title TEXT] [--evidence-limit N] [--root DIR] [--corpus PATH]
   guard:object cat|lock|key SCENE_JSON_PATH [--prompt TEXT]
   workflow:cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--planner deterministic|auto|openai] [--model MODEL] [--root DIR] [--corpus PATH]
-  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--planner deterministic|auto|openai] [--model MODEL] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
+  workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--planner deterministic|auto|openai] [--model MODEL] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   workflow:object PROMPT --output PATH [--format pdf|svg|png|jpg] [--max-guard-iterations N] [--root DIR] [--corpus PATH]
-  workflow:execute-object PROMPT --output PATH [--format pdf|svg|png|jpg] [--run-mode launch|com] [--max-guard-iterations N] [--dry-run] [--no-wait] [--skip-qa] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
+  workflow:execute-object PROMPT --output PATH [--format pdf|svg|png|jpg] [--run-mode launch|com] [--max-guard-iterations N] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   job:status JOB_ID [--root DIR]
   job:wait JOB_ID [--timeout-ms N] [--interval-ms N] [--root DIR]
   job:launch JOB_ID [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--dry-run] [--root DIR]
   job:run-com JOB_ID [--platform auto|windows|wsl] [--dry-run] [--root DIR]
   qa:export PATH [--format pdf|svg|png|jpg] [--min-bytes N] [--min-width N] [--min-height N] [--min-nonblank-ratio N]
+  qa:artwork PATH [--scene SCENE_OR_PLAN_JSON] [--prompt TEXT] [--target TEXT] [--format pdf|svg|png|jpg] [--min-bytes N] [--min-width N] [--min-height N] [--min-nonblank-ratio N]
   serve [--host 127.0.0.1] [--port 4317] [--root DIR]
   semantic:search QUERY [--limit N] [--kind object_semantics|shape_recipe|shape_combination|scientific_concept|visual_metaphor|style_reference|publication_requirement|document_state|illustrator_capability] [--corpus PATH]
   semantic:inspect-vector PATH... [--limit N]

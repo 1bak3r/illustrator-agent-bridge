@@ -3,6 +3,7 @@ import { runJsxViaIllustratorCom } from "../bridge/comAutomation.js";
 import { launchJsxJob, resolveLaunchPlatform, type LaunchJobResult, type LaunchPlatform } from "../bridge/launcher.js";
 import { waitForJobResult, type JobStatus } from "../bridge/results.js";
 import type { ExportFormat } from "../bridge/types.js";
+import { reviewArtworkQuality, type ArtworkReviewReport } from "../qa/artworkReviewGuard.js";
 import { inspectExportArtifact, type ExportQaReport } from "../qa/exportQa.js";
 import { prepareObjectShapeWorkflow, type ObjectShapeWorkflow, type PrepareObjectShapeWorkflowOptions } from "./objectWorkflow.js";
 
@@ -21,6 +22,7 @@ export interface ExecuteObjectShapeWorkflowOptions extends PrepareObjectShapeWor
   minHeight?: number;
   minNonBlankRatio?: number;
   runMode?: ObjectWorkflowRunMode;
+  skipArtworkReview?: boolean;
 }
 
 export interface ObjectShapeWorkflowExecution {
@@ -33,6 +35,7 @@ export interface ObjectShapeWorkflowExecution {
   exportLaunch?: LaunchJobResult;
   exportResult?: JobStatus;
   exportQa?: ExportQaReport;
+  artworkReview?: ArtworkReviewReport;
   next: string[];
 }
 
@@ -130,9 +133,24 @@ export async function executeObjectShapeWorkflow(options: ExecuteObjectShapeWork
           minNonBlankRatio: options.minNonBlankRatio
         })
       : undefined;
+  const artworkReview =
+    waitForResults && !options.skipQa && !options.skipArtworkReview
+      ? reviewArtworkQuality({
+          prompt: workflow.prompt,
+          scene: workflow.plan.scene,
+          exportQa,
+          target: workflow.plan.target
+        })
+      : undefined;
 
   return {
-    ok: sceneLaunch.ok && exportLaunch.ok && (sceneResult?.result?.ok ?? true) && (exportResult?.result?.ok ?? true) && (exportQa?.ok ?? true),
+    ok:
+      sceneLaunch.ok &&
+      exportLaunch.ok &&
+      (sceneResult?.result?.ok ?? true) &&
+      (exportResult?.result?.ok ?? true) &&
+      (exportQa?.ok ?? true) &&
+      (artworkReview?.ok ?? true),
     dryRun,
     runMode,
     workflow,
@@ -141,7 +159,8 @@ export async function executeObjectShapeWorkflow(options: ExecuteObjectShapeWork
     exportLaunch,
     exportResult,
     exportQa,
-    next: nextSteps(dryRun, waitForResults, Boolean(options.skipQa), sceneLaunch, exportLaunch)
+    artworkReview,
+    next: nextSteps(dryRun, waitForResults, Boolean(options.skipQa), sceneLaunch, exportLaunch, artworkReview)
   };
 }
 
@@ -179,7 +198,8 @@ function nextSteps(
   waitForResults: boolean,
   skipQa: boolean,
   sceneLaunch: LaunchJobResult,
-  exportLaunch: LaunchJobResult
+  exportLaunch: LaunchJobResult,
+  artworkReview?: ArtworkReviewReport
 ): string[] {
   if (dryRun) {
     return [
@@ -191,6 +211,10 @@ function nextSteps(
 
   if (!waitForResults) {
     return [sceneLaunch.next.waitForResult, exportLaunch.next.waitForResult];
+  }
+
+  if (artworkReview && !artworkReview.ok && artworkReview.nextGoalPrompt) {
+    return [artworkReview.nextGoalPrompt];
   }
 
   return skipQa ? ["Run qa:export on the exported object artifact before accepting it."] : ["Review exported object artwork visually before accepting it."];

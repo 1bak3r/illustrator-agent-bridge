@@ -14,6 +14,7 @@ import { callIllustratorTool, getIllustratorMcpConfig, listIllustratorTools } fr
 import { planObjectShapeScene } from "../planner/objectShapePlanner.js";
 import { planCartoonSceneWithMode } from "../planner/plannerRouter.js";
 import { planScientificConceptScene } from "../planner/scientificConceptPlanner.js";
+import { reviewArtworkQuality } from "../qa/artworkReviewGuard.js";
 import { inspectExportArtifact } from "../qa/exportQa.js";
 import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
@@ -128,6 +129,40 @@ export function createAgentMcpServer(): McpServer {
       return jsonToolResult({
         ok: report.ok,
         report
+      });
+    }
+  );
+
+  server.registerTool(
+    "review_artwork_quality",
+    {
+      title: "Review Exported Illustrator Artwork",
+      description:
+        "Run export QA plus local scene/artwork critique and return review.nextGoalPrompt when the drawing should be refined before acceptance.",
+      inputSchema: {
+        path: z.string().min(1).max(1000),
+        prompt: z.string().min(1).max(1000).optional(),
+        scene: z.unknown().optional(),
+        target: z.string().min(1).max(120).optional(),
+        format: exportFormatSchema.optional(),
+        minBytes: z.number().int().min(0).optional(),
+        minWidth: z.number().int().min(1).optional(),
+        minHeight: z.number().int().min(1).optional(),
+        minNonBlankRatio: z.number().min(0).max(1).optional()
+      }
+    },
+    async ({ path, prompt, scene, target, format, minBytes, minWidth, minHeight, minNonBlankRatio }) => {
+      const exportQa = await inspectExportArtifact(path, { format, minBytes, minWidth, minHeight, minNonBlankRatio });
+      const review = reviewArtworkQuality({
+        prompt: prompt ?? "review exported Illustrator artwork",
+        scene: scene === undefined ? undefined : normalizeScene(sceneFromJson(scene)),
+        exportQa,
+        target
+      });
+      return jsonToolResult({
+        ok: exportQa.ok && review.ok,
+        exportQa,
+        review
       });
     }
   );
@@ -320,6 +355,7 @@ export function createAgentMcpServer(): McpServer {
         timeoutMs: z.number().int().min(0).max(600_000).optional(),
         intervalMs: z.number().int().min(100).max(60_000).optional(),
         skipQa: z.boolean().optional(),
+        skipArtworkReview: z.boolean().optional(),
         minBytes: z.number().int().min(0).optional(),
         minWidth: z.number().int().min(1).optional(),
         minHeight: z.number().int().min(1).optional(),
@@ -343,6 +379,7 @@ export function createAgentMcpServer(): McpServer {
       timeoutMs,
       intervalMs,
       skipQa,
+      skipArtworkReview,
       minBytes,
       minWidth,
       minHeight,
@@ -365,6 +402,7 @@ export function createAgentMcpServer(): McpServer {
         timeoutMs,
         intervalMs,
         skipQa,
+        skipArtworkReview,
         minBytes,
         minWidth,
         minHeight,
@@ -432,6 +470,7 @@ export function createAgentMcpServer(): McpServer {
         timeoutMs: z.number().int().min(0).max(600_000).optional(),
         intervalMs: z.number().int().min(100).max(60_000).optional(),
         skipQa: z.boolean().optional(),
+        skipArtworkReview: z.boolean().optional(),
         minBytes: z.number().int().min(0).optional(),
         minWidth: z.number().int().min(1).optional(),
         minHeight: z.number().int().min(1).optional(),
@@ -456,6 +495,7 @@ export function createAgentMcpServer(): McpServer {
       timeoutMs,
       intervalMs,
       skipQa,
+      skipArtworkReview,
       minBytes,
       minWidth,
       minHeight,
@@ -479,6 +519,7 @@ export function createAgentMcpServer(): McpServer {
         timeoutMs,
         intervalMs,
         skipQa,
+        skipArtworkReview,
         minBytes,
         minWidth,
         minHeight,
@@ -831,14 +872,15 @@ export function createAgentMcpServer(): McpServer {
                 "bridge_run_job_via_com",
                 "bridge_get_job_status",
                 "bridge_wait_for_job_result",
-                "qa_export_artifact"
+                "qa_export_artifact",
+                "review_artwork_quality"
               ],
               generatedJobContract: {
                 runInIllustrator: "File > Scripts > Other Script",
                 launchFromDesktop: "bridge_launch_job opens a generated JSX through the host OS when file association or app selection is configured.",
                 result: "Each generated JSX job writes a JSON result file.",
                 export: "Export jobs require an active Illustrator document.",
-                qa: "Run qa_export_artifact after an export job writes ok=true; PNG exports include nonblank pixel analysis."
+                qa: "Run qa_export_artifact for file checks, then review_artwork_quality to get a refinement prompt before accepting the artwork."
               }
             },
             null,
@@ -876,4 +918,22 @@ function runInstructions(job: { illustratorJobPath: string; resultPath: string; 
     resultPath: job.resultPath,
     illustratorResultPath: job.illustratorResultPath
   };
+}
+
+function sceneFromJson(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  const plan = record.plan;
+  if (typeof plan === "object" && plan !== null && !Array.isArray(plan) && "scene" in plan) {
+    return (plan as Record<string, unknown>).scene;
+  }
+
+  if ("scene" in record) {
+    return record.scene;
+  }
+
+  return value;
 }

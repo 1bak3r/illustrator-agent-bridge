@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 import { launchJsxJob, type LaunchJobResult, type LaunchPlatform } from "../bridge/launcher.js";
 import { waitForJobResult, type JobStatus } from "../bridge/results.js";
 import type { ExportFormat } from "../bridge/types.js";
+import { reviewArtworkQuality, type ArtworkReviewReport } from "../qa/artworkReviewGuard.js";
 import { inspectExportArtifact, type ExportQaReport } from "../qa/exportQa.js";
 import { prepareCartoonWorkflow, type CartoonWorkflow, type PrepareCartoonWorkflowOptions } from "./cartoonWorkflow.js";
 
@@ -17,6 +18,7 @@ export interface ExecuteCartoonWorkflowOptions extends PrepareCartoonWorkflowOpt
   minWidth?: number;
   minHeight?: number;
   minNonBlankRatio?: number;
+  skipArtworkReview?: boolean;
 }
 
 export interface CartoonWorkflowExecution {
@@ -28,6 +30,7 @@ export interface CartoonWorkflowExecution {
   exportLaunch?: LaunchJobResult;
   exportResult?: JobStatus;
   exportQa?: ExportQaReport;
+  artworkReview?: ArtworkReviewReport;
   next: string[];
 }
 
@@ -121,9 +124,23 @@ export async function executeCartoonWorkflow(options: ExecuteCartoonWorkflowOpti
           minNonBlankRatio: options.minNonBlankRatio
         })
       : undefined;
+  const artworkReview =
+    waitForResults && !options.skipQa && !options.skipArtworkReview
+      ? reviewArtworkQuality({
+          prompt: workflow.prompt,
+          scene: workflow.plan.scene,
+          exportQa
+        })
+      : undefined;
 
   return {
-    ok: sceneLaunch.ok && exportLaunch.ok && (sceneResult?.result?.ok ?? true) && (exportResult?.result?.ok ?? true) && (exportQa?.ok ?? true),
+    ok:
+      sceneLaunch.ok &&
+      exportLaunch.ok &&
+      (sceneResult?.result?.ok ?? true) &&
+      (exportResult?.result?.ok ?? true) &&
+      (exportQa?.ok ?? true) &&
+      (artworkReview?.ok ?? true),
     dryRun,
     workflow,
     sceneLaunch,
@@ -131,7 +148,8 @@ export async function executeCartoonWorkflow(options: ExecuteCartoonWorkflowOpti
     exportLaunch,
     exportResult,
     exportQa,
-    next: nextSteps(dryRun, waitForResults, Boolean(options.skipQa), sceneLaunch, exportLaunch)
+    artworkReview,
+    next: nextSteps(dryRun, waitForResults, Boolean(options.skipQa), sceneLaunch, exportLaunch, artworkReview)
   };
 }
 
@@ -148,7 +166,8 @@ function nextSteps(
   waitForResults: boolean,
   skipQa: boolean,
   sceneLaunch: LaunchJobResult,
-  exportLaunch: LaunchJobResult
+  exportLaunch: LaunchJobResult,
+  artworkReview?: ArtworkReviewReport
 ): string[] {
   if (dryRun) {
     return [
@@ -160,6 +179,10 @@ function nextSteps(
 
   if (!waitForResults) {
     return [sceneLaunch.next.waitForResult, exportLaunch.next.waitForResult];
+  }
+
+  if (artworkReview && !artworkReview.ok && artworkReview.nextGoalPrompt) {
+    return [artworkReview.nextGoalPrompt];
   }
 
   return skipQa ? ["Run qa:export on the exported artifact before publication use."] : ["Review exported artwork visually before publication use."];

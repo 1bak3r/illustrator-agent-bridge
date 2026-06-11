@@ -456,6 +456,43 @@ test("HTTP bridge QA checks an exported SVG", async () => {
   }
 });
 
+test("HTTP bridge reviews exported artwork and returns refinement prompts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-artwork-review-"));
+  const server = await startBridgeServer({ port: 0, root });
+  const svgPath = join(root, "exports", "cat-label.svg");
+
+  try {
+    await mkdir(join(root, "exports"), { recursive: true });
+    await writeFile(svgPath, `<svg width="720" height="480"><text x="320" y="250">cat</text></svg>`, "utf8");
+    const response = await fetch(`${server.url}/v1/qa/artwork`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: svgPath,
+        prompt: "full cat icon",
+        target: "cat",
+        minBytes: 1,
+        scene: {
+          document: { width: 720, height: 480 },
+          elements: [
+            { type: "rect", name: "background", x: 0, y: 0, width: 720, height: 480, style: { fill: "#ffffff", stroke: null } },
+            { type: "text", name: "cat-label", x: 320, y: 250, text: "cat", size: 42, style: { fill: "#111111", stroke: null } }
+          ]
+        }
+      })
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { ok: boolean; exportQa: { ok: boolean }; review: { ok: boolean; nextGoalPrompt: string | null } };
+    assert.equal(body.ok, false);
+    assert.equal(body.exportQa.ok, true);
+    assert.equal(body.review.ok, false);
+    assert.match(body.review.nextGoalPrompt ?? "", /Make the cat recognizable/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("HTTP bridge QA checks PNG nonblank pixels", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-qa-png-"));
   const server = await startBridgeServer({ port: 0, root });
