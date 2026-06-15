@@ -47,6 +47,7 @@ npm run semantic:search -- "cartoon lab flask"
 npm run semantic:search -- "electron transfer membrane" -- --kind scientific_concept
 npm run semantic:inspect-vector -- ./examples/cartoon-scene.json
 npm run plan:cartoon -- "cartoon lab scientist with flask"
+npm run plan:cartoon -- "urban transit system with skyline river solar rooftops and data overlay"
 npm run plan:scientific -- "polymer membrane electron transfer catalytic concept"
 npm run plan:object -- "full cat icon"
 npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner auto
@@ -257,7 +258,7 @@ It also exposes `semantic_search_visual_knowledge` so an agent can retrieve obje
 Use `inspect_vector_shape_files` on local reviewed vector files when a browser agent needs shape-combination evidence before updating a corpus.
 Use `detect_illustrator_desktop` and `probe_illustrator_communication` first to prove local no-key Illustrator communication. On Windows/WSL, pass `method: "com"`, `drawCircle: true`, and `waitForResult: true` to prove Illustrator can draw a circle and report completion.
 Pass `drawComplex: true` and `mouseProof: true` to prove multi-element vector drawing plus actual pointer control. Use `drive_illustrator_mouse` directly when an agent needs a measured move, click, double-click, or drag against the live Illustrator window.
-Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
+Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX. The deterministic fallback now handles broad prompts with richer editable archetypes for lab scenes, urban/transit systems, workflows/processes, ecosystems/landscapes, and generic explainer diagrams instead of returning a sparse placeholder.
 Use `plan_scientific_concept_scene_job` when the prompt is an abstract or complex scientific concept. It retrieves scientific concepts and visual metaphors before creating the Illustrator scene job.
 Use `plan_object_shape_scene_job` when the prompt asks for a concrete cat, lock, or key. It returns `plan.guard`, including `guard.nextGoalPrompt` / `guard.nextPrompt` for the next refinement pass if the object is missing required recognizable parts.
 Use `guard_object_shape_scene` to check a proposed scene before or after a refinement step.

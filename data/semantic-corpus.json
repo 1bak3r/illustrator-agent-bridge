@@ -32,6 +32,30 @@
     "source": "local seed object grammar"
   },
   {
+    "id": "object.urban-transit-system",
+    "kind": "object_semantics",
+    "title": "Urban transit system",
+    "tags": ["city", "urban", "transit", "train", "rail", "station", "skyline", "river", "infrastructure"],
+    "text": "An urban transit system illustration should combine skyline buildings, transit route lines, station nodes, trains or buses, platforms, bike lanes, parks or a river corridor, and optional data overlay nodes. Keep each layer named separately so a browser agent can revise transit, buildings, environment, and labels independently.",
+    "source": "local seed scene grammar"
+  },
+  {
+    "id": "object.workflow-process-system",
+    "kind": "object_semantics",
+    "title": "Workflow process system",
+    "tags": ["workflow", "process", "pipeline", "supply-chain", "factory", "timeline", "cycle"],
+    "text": "A workflow or process illustration reads as ordered stage panels connected by arrows, with input, processing, quality gate, output, status nodes, and a feedback loop. Repeated panels should use consistent shapes and named details.",
+    "source": "local seed scene grammar"
+  },
+  {
+    "id": "object.ecosystem-landscape-system",
+    "kind": "object_semantics",
+    "title": "Ecosystem landscape system",
+    "tags": ["ecosystem", "landscape", "forest", "river", "habitat", "watershed", "farm", "climate"],
+    "text": "An ecosystem scene should layer sky, landforms, water flow, forest patches, habitat pools, farms or fields, clouds, sun, and callouts that explain flows. Use visual structure first, then concise labels.",
+    "source": "local seed scene grammar"
+  },
+  {
     "id": "shape.instrument-callout-composition",
     "kind": "shape_combination",
     "title": "Complex instrument callout composition",
@@ -45,6 +69,14 @@
     "title": "Mechanical assembly vector grammar",
     "tags": ["mechanical", "machine", "gear", "motor", "sensor", "assembly", "panel"],
     "text": "Mechanical assemblies read well with a main chassis, exposed drive train, gears with teeth and hubs, belt spans, access panels, screws, sensor modules, and controls. Make repeated parts consistent and named so they can be revised individually.",
+    "source": "local seed shape combination"
+  },
+  {
+    "id": "shape.layered-system-illustration",
+    "kind": "shape_combination",
+    "title": "Layered system illustration",
+    "tags": ["system", "layers", "diagram", "map", "callout", "editable"],
+    "text": "Broad prompts become stronger Illustrator scenes when background context, main subject, infrastructure or process layers, overlays, callouts, and labels are separate named vector elements. Use enough concrete shapes that the drawing remains meaningful without relying on a caption.",
     "source": "local seed shape combination"
   },
   {
