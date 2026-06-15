@@ -141,7 +141,7 @@ npm run plan:object -- "simple house key icon"
 node dist/src/cli.js guard:object cat ./saved-plan-output.json
 ```
 
-`plan:object` supports `cat`, `lock`, and `key` targets today. It retrieves local shape recipes, learned `shape_combination` evidence, object semantics, style, and publication constraints, then builds a named Illustrator vector scene, runs structural scene QA, and runs the object guard. The guard rejects missing, invisible, or zero-size required parts, incoherent placement, target-word text labels, and object silhouettes that are too small to read. When `plan.guard.ok` is false, feed `plan.guard.nextGoalPrompt` or `plan.guard.nextPrompt` into the next planning call so the agent keeps iterating until the object is recognizable.
+`plan:object` supports strict guarded `cat`, `lock`, and `key` targets today. The Adobe SVG proof workflow also has a generic object fallback for unsupported object prompts such as microscopes, reactors, instruments, machines, and other complex apparatuses. The strict path retrieves local shape recipes, learned `shape_combination` evidence, object semantics, style, and publication constraints, then builds a named Illustrator vector scene, runs structural scene QA, and runs the object guard. The generic fallback retrieves object/scientific/style evidence, infers a broad archetype, builds named editable components and callouts, and then relies on export QA plus artwork review rather than the cat/lock/key structural guard. The guard rejects missing, invisible, or zero-size required parts, incoherent placement, target-word text labels, and object silhouettes that are too small to read. When `plan.guard.ok` is false, feed `plan.guard.nextGoalPrompt` or `plan.guard.nextPrompt` into the next planning call so the agent keeps iterating until the object is recognizable.
 
 Run a guarded object workflow end-to-end:
 
@@ -167,6 +167,14 @@ npm run workflow:adobe-svg-proof -- "core shell emulsion polymerization scientif
 npm run workflow:execute-adobe-svg-proof -- "core shell emulsion polymerization scientific concept" \
   --output ./var/exports/core-shell.svg \
   --intent auto \
+  --illustrator-run-mode com \
+  --platform wsl \
+  --photoshop-platform wsl \
+  --max-review-iterations 3
+
+npm run workflow:execute-adobe-svg-proof -- "complex microscope object with objective lenses and calibration controls" \
+  --output ./var/exports/microscope.svg \
+  --intent object \
   --illustrator-run-mode com \
   --platform wsl \
   --photoshop-platform wsl \

@@ -16,6 +16,38 @@
     "source": "local seed visual semantics"
   },
   {
+    "id": "object.microscope.vector-grammar",
+    "kind": "object_semantics",
+    "title": "Microscope vector grammar",
+    "tags": ["microscope", "instrument", "eyepiece", "objective", "stage", "focus", "slide", "illumination"],
+    "text": "A microscope is recognizable from an eyepiece, angled optical tube, objective turret, stage with slide clips, focus knobs, illumination path, vertical arm, and heavy base. Keep the optical path and stage aligned so it reads as a real instrument before adding labels.",
+    "source": "local seed object grammar"
+  },
+  {
+    "id": "object.reactor.vector-grammar",
+    "kind": "object_semantics",
+    "title": "Reactor vessel vector grammar",
+    "tags": ["reactor", "bioreactor", "vessel", "tank", "impeller", "baffle", "sensor", "pipe"],
+    "text": "A reactor or bioreactor reads as a transparent vessel with top and bottom domes, a central agitator shaft, impeller blades, baffles, inlet and outlet pipes, sensors or gauges, liquid fill, and bubbles or particles when mixing is important.",
+    "source": "local seed object grammar"
+  },
+  {
+    "id": "shape.instrument-callout-composition",
+    "kind": "shape_combination",
+    "title": "Complex instrument callout composition",
+    "tags": ["instrument", "apparatus", "callout", "shape", "combination", "editable"],
+    "text": "A complex object stays editable when the main silhouette, panels, ports, optics, controls, fasteners, shadows, leader lines, and labels are separate named vector parts. Use callouts sparingly and make each callout point to a concrete shape.",
+    "source": "local seed shape combination"
+  },
+  {
+    "id": "shape.mechanical-assembly-vector",
+    "kind": "shape_combination",
+    "title": "Mechanical assembly vector grammar",
+    "tags": ["mechanical", "machine", "gear", "motor", "sensor", "assembly", "panel"],
+    "text": "Mechanical assemblies read well with a main chassis, exposed drive train, gears with teeth and hubs, belt spans, access panels, screws, sensor modules, and controls. Make repeated parts consistent and named so they can be revised individually.",
+    "source": "local seed shape combination"
+  },
+  {
     "id": "shape.cat.full-body",
     "kind": "shape_recipe",
     "title": "Full cat vector recipe",

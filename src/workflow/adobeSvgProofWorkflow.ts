@@ -9,6 +9,7 @@ import { generatedPhotoshopJobSummary } from "../bridge/photoshopJsxGenerator.js
 import { waitForJobResult, type JobStatus } from "../bridge/results.js";
 import type { CartoonScene, GeneratedJob } from "../bridge/types.js";
 import type { CartoonPlan } from "../planner/cartoonPlanner.js";
+import { planGenericObjectScene, type GenericObjectPlan } from "../planner/genericObjectPlanner.js";
 import { inferObjectShapeTarget, ObjectShapePlannerError, planObjectShapeScene, type ObjectShapePlan } from "../planner/objectShapePlanner.js";
 import { planCartoonSceneWithMode, type PlannerMode } from "../planner/plannerRouter.js";
 import { planScientificConceptScene, type ScientificConceptPlan } from "../planner/scientificConceptPlanner.js";
@@ -19,7 +20,7 @@ import type { SemanticItem } from "../semantic/types.js";
 
 export type AdobeArtworkIntent = "auto" | "cartoon" | "scientific" | "object";
 export type AdobeSvgProofRunMode = "launch" | "com";
-export type AdobeArtworkPlan = CartoonPlan | ScientificConceptPlan | ObjectShapePlan;
+export type AdobeArtworkPlan = CartoonPlan | ScientificConceptPlan | ObjectShapePlan | GenericObjectPlan;
 
 export interface PrepareAdobeSvgProofWorkflowOptions {
   prompt: string;
@@ -390,11 +391,12 @@ async function planSceneForPrompt(
   const intent = resolveIntent(prompt, options.intent);
 
   if (intent === "object") {
-    const plan = planObjectShapeScene(prompt, corpus, {
+    const objectOptions = {
       width: options.width,
       height: options.height,
       title: options.title
-    });
+    };
+    const plan = planStrictObjectShapeSceneOrGeneric(prompt, corpus, objectOptions);
     return { intent, plan, scene: plan.scene };
   }
 
@@ -433,6 +435,14 @@ function resolveIntent(prompt: string, intent: AdobeArtworkIntent | undefined): 
     }
   }
 
+  if (looksScientific(prompt) && !looksGenericObjectPrompt(prompt)) {
+    return "scientific";
+  }
+
+  if (looksGenericObjectPrompt(prompt)) {
+    return "object";
+  }
+
   if (looksScientific(prompt)) {
     return "scientific";
   }
@@ -444,6 +454,27 @@ function looksScientific(prompt: string): boolean {
   return /\b(scientific|concept|polymer|emulsion|molecular|cataly(?:st|sis|tic)|reaction|membrane|electron|phase|biobased|bio-based|latex|micelle|surfactant|protein|cell|redox|monomer|initiator)\b/i.test(
     prompt
   );
+}
+
+function looksGenericObjectPrompt(prompt: string): boolean {
+  return /\b(object|icon|shape|silhouette|device|machine|instrument|equipment|apparatus|tool|microscope|objective|eyepiece|reactor|bioreactor|fermenter|vessel|tank|impeller|baffle|gear|engine|motor|robot|drone|pump|valve|sensor|assembly)\b/i.test(
+    prompt
+  );
+}
+
+function planStrictObjectShapeSceneOrGeneric(
+  prompt: string,
+  corpus: SemanticItem[],
+  options: { width?: number; height?: number; title?: string }
+): ObjectShapePlan | GenericObjectPlan {
+  try {
+    return planObjectShapeScene(prompt, corpus, options);
+  } catch (error) {
+    if (!(error instanceof ObjectShapePlannerError) || prompt.trim().length === 0) {
+      throw error;
+    }
+    return planGenericObjectScene(prompt, corpus, options);
+  }
 }
 
 async function runIllustratorWorkflowJob(

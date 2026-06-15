@@ -29,6 +29,27 @@ test("prepareAdobeSvgProofWorkflow routes scientific prompts to Illustrator SVG 
   await access(workflow.photoshopProofJob.jobPath);
 });
 
+test("prepareAdobeSvgProofWorkflow falls back to generic object planning for unsupported object targets", async () => {
+  const root = await mkdtemp(join(tmpdir(), "adobe-svg-proof-generic-object-"));
+  const workflow = await prepareAdobeSvgProofWorkflow({
+    prompt: "complex microscope object with objective lenses and calibration controls",
+    outputPath: "var/exports/microscope.svg",
+    root,
+    intent: "auto"
+  });
+
+  assert.equal(workflow.ok, true);
+  assert.equal(workflow.intent, "object");
+  assert.equal(workflow.plan.planner, "generic-object-deterministic");
+  assert.ok(!("guard" in workflow.plan));
+  assert.ok(workflow.plan.evidence.length > 0);
+  assert.ok(workflow.plan.scene.elements.some((element) => element.name === "objective lens long"));
+  assert.ok(workflow.plan.scene.elements.some((element) => element.name === "coarse focus outer knob"));
+  await access(workflow.sceneJob.jobPath);
+  await access(workflow.exportJob.jobPath);
+  await access(workflow.photoshopProofJob.jobPath);
+});
+
 test("executeAdobeSvgProofWorkflow dry-runs Illustrator COM and Photoshop COM proofing", async () => {
   const root = await mkdtemp(join(tmpdir(), "adobe-svg-proof-execute-"));
   const execution = await executeAdobeSvgProofWorkflow({
@@ -58,6 +79,29 @@ test("executeAdobeSvgProofWorkflow dry-runs Illustrator COM and Photoshop COM pr
   assert.match(execution.photoshopLaunch?.next.resultContract ?? "", /Photoshop/);
   assert.equal(execution.sceneResult, undefined);
   assert.equal(execution.proofQa, undefined);
+});
+
+test("executeAdobeSvgProofWorkflow dry-runs generic object fallback without strict guard stop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "adobe-svg-proof-generic-object-execute-"));
+  const execution = await executeAdobeSvgProofWorkflow({
+    prompt: "complex microscope object with objective lenses and calibration controls",
+    outputPath: "var/exports/microscope.svg",
+    root,
+    intent: "object",
+    illustratorRunMode: "com",
+    launchPlatform: "wsl",
+    photoshopPlatform: "wsl",
+    dryRun: true,
+    maxReviewIterations: 2
+  });
+
+  assert.equal(execution.ok, true);
+  assert.equal(execution.workflow.intent, "object");
+  assert.equal(execution.workflow.plan.planner, "generic-object-deterministic");
+  assert.ok(!("guard" in execution.workflow.plan));
+  assert.equal(execution.reviewIterations.length, 1);
+  assert.equal(execution.sceneLaunch?.command.command, "powershell.exe");
+  assert.equal(execution.photoshopLaunch?.command.command, "powershell.exe");
 });
 
 test("shouldReviseArtworkFromReview treats review warnings as actionable refinement", () => {
