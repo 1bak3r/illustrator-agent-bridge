@@ -24,6 +24,7 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.ok(listed.tools.some((tool) => tool.name === "drive_illustrator_mouse"));
     assert.ok(listed.tools.some((tool) => tool.name === "prepare_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "execute_cartoon_publication_workflow"));
+    assert.ok(listed.tools.some((tool) => tool.name === "execute_adobe_svg_proof_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "prepare_object_shape_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "execute_object_shape_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "plan_cartoon_scene_job"));
@@ -224,6 +225,31 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.equal(executionBody.ok, true);
     assert.equal(executionBody.dryRun, true);
     assert.equal(executionBody.sceneLaunch.dryRun, true);
+
+    const adobeProofResult = await client.callTool({
+      name: "execute_adobe_svg_proof_workflow",
+      arguments: {
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/mcp-adobe-proof.svg",
+        intent: "cartoon",
+        root,
+        platform: "wsl",
+        photoshopPlatform: "wsl",
+        illustratorRunMode: "com",
+        dryRun: true,
+        maxReviewIterations: 3
+      }
+    });
+    const adobeProofContent = adobeProofResult.content as Array<{ type: string; text?: string }>;
+    const adobeProofBody = JSON.parse(adobeProofContent[0]?.text ?? "");
+    assert.equal(adobeProofBody.ok, true);
+    assert.equal(adobeProofBody.dryRun, true);
+    assert.equal(adobeProofBody.reviewIterations.length, 1);
+    assert.equal(adobeProofBody.reviewIterations[0].attempt, 1);
+    assert.equal(adobeProofBody.workflow.intent, "cartoon");
+    assert.equal(adobeProofBody.workflow.runbook.length, 6);
+    assert.equal(adobeProofBody.sceneLaunch.command.command, "powershell.exe");
+    assert.equal(adobeProofBody.photoshopLaunch.command.command, "powershell.exe");
 
     const objectWorkflowResult = await client.callTool({
       name: "prepare_object_shape_workflow",

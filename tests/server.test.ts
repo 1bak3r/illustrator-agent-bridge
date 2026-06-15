@@ -391,6 +391,53 @@ test("HTTP bridge executes a cartoon workflow dry-run", async () => {
   }
 });
 
+test("HTTP bridge executes an Adobe SVG proof workflow dry-run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-adobe-proof-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/adobe-svg-proof/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/http-adobe-proof.svg",
+        intent: "cartoon",
+        platform: "wsl",
+        photoshopPlatform: "wsl",
+        illustratorRunMode: "com",
+        dryRun: true,
+        maxReviewIterations: 3
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      reviewIterations: Array<{ attempt: number; nextGoalPrompt: string | null }>;
+      workflow: { intent: string; photoshopProofJob: { jobPath: string }; runbook: unknown[] };
+      sceneLaunch: { command: { command: string } };
+      exportLaunch: { command: { command: string } };
+      photoshopLaunch: { command: { command: string }; next: { resultContract: string } };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.reviewIterations.length, 1);
+    assert.equal(body.reviewIterations[0]?.attempt, 1);
+    assert.equal(body.reviewIterations[0]?.nextGoalPrompt, null);
+    assert.equal(body.workflow.intent, "cartoon");
+    assert.equal(body.workflow.runbook.length, 6);
+    assert.match(body.workflow.photoshopProofJob.jobPath, /jobs\/.+\.jsx$/);
+    assert.equal(body.sceneLaunch.command.command, "powershell.exe");
+    assert.equal(body.exportLaunch.command.command, "powershell.exe");
+    assert.equal(body.photoshopLaunch.command.command, "powershell.exe");
+    assert.match(body.photoshopLaunch.next.resultContract, /Photoshop/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("HTTP bridge executes an object workflow dry-run through COM mode", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-object-execute-"));
   const server = await startBridgeServer({ port: 0, root });

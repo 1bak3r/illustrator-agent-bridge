@@ -1,0 +1,59 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { createGeneratedPhotoshopJob } from "../src/bridge/photoshopJobs.js";
+import { generatePhotoshopJsx } from "../src/bridge/photoshopJsxGenerator.js";
+import { runJsxViaPhotoshopCom } from "../src/bridge/photoshopComAutomation.js";
+
+test("generates a Photoshop-targeted SVG proof JSX job", () => {
+  const jsx = generatePhotoshopJsx(
+    {
+      kind: "svg_proof",
+      inputPath: "C:/Users/example/out/figure.svg",
+      outputPath: "C:/Users/example/out/figure-proof.png",
+      width: 1200,
+      height: 800,
+      resolution: 144
+    },
+    { id: "photoshop-job-1", resultPath: "C:/Users/example/out/result.json" }
+  );
+
+  assert.match(jsx, /#target photoshop/);
+  assert.match(jsx, /DialogModes\.NO/);
+  assert.match(jsx, /app\.open\(inputFile\)/);
+  assert.match(jsx, /doc\.resizeImage\(UnitValue\(1200, 'px'\), UnitValue\(800, 'px'\), 144, ResampleMethod\.BICUBIC\)/);
+  assert.match(jsx, /PNGSaveOptions/);
+  assert.match(jsx, /"kind":"svg_proof"/);
+  assert.match(jsx, /figure-proof\.png/);
+});
+
+test("creates a Photoshop proof job and can dry-run Photoshop COM execution", async () => {
+  const root = await mkdtemp(join(tmpdir(), "photoshop-proof-job-"));
+  const job = await createGeneratedPhotoshopJob(
+    {
+      kind: "svg_proof",
+      inputPath: "var/exports/figure.svg",
+      outputPath: "var/exports/figure-proof.png"
+    },
+    root,
+    { hostPlatform: "wsl" }
+  );
+
+  assert.match(job.jobPath, /jobs\/.+\.jsx$/);
+  assert.match(job.resultPath, /results\/.+\.json$/);
+  assert.match(job.jsx, /#target photoshop/);
+  assert.match(job.photoshopJobPath, /jobs\/.+\.jsx$/);
+
+  const launch = await runJsxViaPhotoshopCom(job.jobPath, {
+    platform: "wsl",
+    dryRun: true,
+    root
+  });
+
+  assert.equal(launch.ok, true);
+  assert.equal(launch.dryRun, true);
+  assert.equal(launch.command.command, "powershell.exe");
+  assert.match(launch.next.resultContract, /Photoshop/);
+});

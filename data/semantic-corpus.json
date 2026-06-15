@@ -80,6 +80,14 @@
     "source": "local scientific visual semantics"
   },
   {
+    "id": "concept.core-shell-emulsion-polymerization",
+    "kind": "scientific_concept",
+    "title": "Core-shell emulsion polymerization",
+    "tags": ["core-shell", "emulsion", "polymerization", "latex", "seed", "surfactant", "micelle", "initiator", "radical", "shell", "monomer"],
+    "text": "A core-shell emulsion polymerization figure should show an aqueous phase with surfactant-stabilized monomer droplets or explicit micelles drawn with head-tail surfactant grammar, seed latex particles, water-soluble initiator radicals, first-stage core polymerization inside seed particles, second-stage shell monomer feed at the particle surface, and a final enlarged cross-section with distinct core, shell, and stabilizing surfactant corona. Keep the pre-emulsion panel as component setup; reserve directional monomer/radical diffusion arrows for the core-polymerization stage.",
+    "source": "local scientific visual semantics"
+  },
+  {
     "id": "concept.catalytic-reaction-cycle",
     "kind": "scientific_concept",
     "title": "Catalytic reaction cycle",
