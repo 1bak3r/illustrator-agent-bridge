@@ -17,6 +17,7 @@
     "jsx:cartoon": "node dist/src/cli.js jsx:cartoon examples/cartoon-scene.json",
     "jsx:export": "node dist/src/cli.js jsx:export",
     "photoshop:proof-svg": "node dist/src/cli.js photoshop:proof-svg",
+    "photoshop:mouse": "node dist/src/cli.js photoshop:mouse",
     "illustrator:detect": "node dist/src/cli.js illustrator:detect",
     "illustrator:probe": "node dist/src/cli.js illustrator:probe",
     "illustrator:mouse": "node dist/src/cli.js illustrator:mouse",

@@ -56,7 +56,9 @@ test("executeAdobeProjectWorkflow dry-runs the full app round-trip through COM",
     launchPlatform: "wsl",
     photoshopPlatform: "wsl",
     dryRun: true,
-    maxReviewIterations: 3
+    maxReviewIterations: 3,
+    visibleMouseProof: true,
+    visibleMouseDurationMs: 900
   });
 
   assert.equal(execution.ok, true);
@@ -64,12 +66,22 @@ test("executeAdobeProjectWorkflow dry-runs the full app round-trip through COM",
   assert.equal(execution.illustratorRunMode, "com");
   assert.equal(execution.photoshopRunMode, "com");
   assert.equal(execution.reviewIterations.length, 1);
-  assert.equal(execution.workflow.runbook.length, 8);
+  assert.equal(execution.workflow.runbook.length, 12);
+  assert.equal(execution.workflow.handoff.sequence.length, 7);
+  assert.match(execution.workflow.photoshopCommitJob?.jobPath ?? "", /jobs\/.+\.jsx$/);
   assert.equal(execution.sceneLaunch?.command.command, "powershell.exe");
   assert.equal(execution.sourceExportLaunch?.command.command, "powershell.exe");
   assert.equal(execution.photoshopProjectLaunch?.command.command, "powershell.exe");
+  assert.equal(execution.photoshopCommitLaunch?.command.command, "powershell.exe");
   assert.equal(execution.illustratorReferenceLaunch?.command.command, "powershell.exe");
   assert.equal(execution.finalExportLaunch?.command.command, "powershell.exe");
   assert.match(execution.photoshopProjectLaunch?.next.resultContract ?? "", /Photoshop/);
+  assert.match(execution.photoshopCommitLaunch?.next.resultContract ?? "", /Photoshop/);
+  assert.equal(execution.visibleMouseProofs?.illustratorScene?.action, "dry-run");
+  assert.equal(execution.visibleMouseProofs?.photoshopEdit?.target, "photoshop");
+  assert.equal(execution.visibleMouseProofs?.photoshopEdit?.action, "dry-run");
+  assert.equal(execution.visibleMouseProofs?.illustratorReturn?.target, "illustrator");
+  assert.match(execution.visibleMouseProofs?.illustratorScene?.stdout ?? "", /SetCursorPos/);
+  assert.match(execution.visibleMouseProofs?.photoshopEdit?.stdout ?? "", /Photoshop/);
   assert.equal(execution.photoshopFeedback, undefined);
 });

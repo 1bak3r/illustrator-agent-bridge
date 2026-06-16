@@ -1,4 +1,10 @@
-import type { GeneratedPhotoshopJob, PhotoshopCommand, PhotoshopProjectPassCommand, PhotoshopSvgProofCommand } from "./photoshopTypes.js";
+import type {
+  GeneratedPhotoshopJob,
+  PhotoshopCommand,
+  PhotoshopProjectCommitCommand,
+  PhotoshopProjectPassCommand,
+  PhotoshopSvgProofCommand
+} from "./photoshopTypes.js";
 
 export interface GeneratePhotoshopOptions {
   id: string;
@@ -14,7 +20,11 @@ export function generatePhotoshopJsx(command: PhotoshopCommand, options: Generat
     return generateSvgProofJsx(command, options);
   }
 
-  return generateProjectPassJsx(command, options);
+  if (command.kind === "project_pass") {
+    return generateProjectPassJsx(command, options);
+  }
+
+  return generateProjectCommitJsx(command, options);
 }
 
 export function generatedPhotoshopJobSummary(job: GeneratedPhotoshopJob) {
@@ -166,10 +176,101 @@ function generateProjectPassJsx(command: PhotoshopProjectPassCommand, options: G
       jsonLiteral(note) +
       ") + ']}';",
     "    writeText(feedbackFile.fsName, feedbackText);",
-    "    doc.close(SaveOptions.DONOTSAVECHANGES);",
-    "    doc = null;",
+    command.keepOpen ? "    // Keep the Photoshop document open for a visible mouse edit pass." : "    doc.close(SaveOptions.DONOTSAVECHANGES);",
+    command.keepOpen ? "" : "    doc = null;",
     "    app.displayDialogs = previousDialogs;",
-    `    writeResult('{"ok":true,"jobId":${jsonLiteral(options.id)},"kind":"project_pass","inputPath":${jsonLiteral(command.inputPath)},"outputPngPath":${jsonLiteral(command.outputPngPath)},"outputSvgPath":${jsonLiteral(command.outputSvgPath)},"outputPsdPath":${jsonLiteral(command.outputPsdPath)},"feedbackPath":${jsonLiteral(command.feedbackPath)},"width":' + proofWidth + ',"height":' + proofHeight + ',"app":"Adobe Photoshop","version":' + jsonString(app.version) + '}');`,
+    `    writeResult('{"ok":true,"jobId":${jsonLiteral(options.id)},"kind":"project_pass","inputPath":${jsonLiteral(command.inputPath)},"outputPngPath":${jsonLiteral(command.outputPngPath)},"outputSvgPath":${jsonLiteral(command.outputSvgPath)},"outputPsdPath":${jsonLiteral(command.outputPsdPath)},"feedbackPath":${jsonLiteral(command.feedbackPath)},"width":' + proofWidth + ',"height":' + proofHeight + ',"keepOpen":${command.keepOpen ? "true" : "false"},"app":"Adobe Photoshop","version":' + jsonString(app.version) + '}');`,
+    "  } catch (e) {",
+    "    try { if (doc !== null) { doc.close(SaveOptions.DONOTSAVECHANGES); } } catch (closeError) {}",
+    "    try { if (previousDialogs !== null) { app.displayDialogs = previousDialogs; } } catch (dialogError) {}",
+    "    writeFailure(e);",
+    "    throw e;",
+    "  }",
+    "}());",
+    ""
+  ].join("\n");
+}
+
+function generateProjectCommitJsx(command: PhotoshopProjectCommitCommand, options: GeneratePhotoshopOptions): string {
+  const passName = command.passName ?? "Photoshop visible mouse commit";
+  const prompt = command.prompt ?? "Illustrator and Photoshop collaborative project";
+  const note = "Photoshop commit: active document was edited through measured visible mouse control, then saved as PSD/PNG/SVG handoff.";
+  const closeDocument = command.closeDocument ?? true;
+
+  return [
+    "#target photoshop",
+    "(function () {",
+    runtimeFunctions(options),
+    "  var previousDialogs = null;",
+    "  var doc = null;",
+    "  try {",
+    "    previousDialogs = app.displayDialogs;",
+    "    app.displayDialogs = DialogModes.NO;",
+    `    var inputPath = ${jsonLiteral(command.inputPath ?? "")};`,
+    "    if (app.documents.length > 0) {",
+    "      doc = app.activeDocument;",
+    "    } else {",
+    "      if (inputPath.length === 0) {",
+    "        throw new Error('No active Photoshop document is open for project commit.');",
+    "      }",
+    "      var inputFile = new File(inputPath);",
+    "      if (!inputFile.exists) {",
+    "        throw new Error('Input SVG/project file does not exist: ' + inputFile.fsName);",
+    "      }",
+    "      doc = app.open(inputFile);",
+    "    }",
+    `    var outputPngFile = new File(${jsonLiteral(command.outputPngPath)});`,
+    `    var outputSvgFile = new File(${jsonLiteral(command.outputSvgPath)});`,
+    `    var outputPsdFile = new File(${jsonLiteral(command.outputPsdPath)});`,
+    `    var feedbackFile = new File(${jsonLiteral(command.feedbackPath)});`,
+    "    ensureParent(outputPngFile);",
+    "    ensureParent(outputSvgFile);",
+    "    ensureParent(outputPsdFile);",
+    "    ensureParent(feedbackFile);",
+    "    var proofWidth = dimensionPixels(doc.width);",
+    "    var proofHeight = dimensionPixels(doc.height);",
+    "    var psdOptions = new PhotoshopSaveOptions();",
+    "    psdOptions.layers = true;",
+    "    doc.saveAs(outputPsdFile, psdOptions, true, Extension.LOWERCASE);",
+    "    var pngOptions = new PNGSaveOptions();",
+    "    doc.saveAs(outputPngFile, pngOptions, true, Extension.LOWERCASE);",
+    `    var handoffTitle = ${jsonLiteral(passName)};`,
+    `    var handoffNote = ${jsonLiteral(note)};`,
+    "    var strokeStartX = Math.round(proofWidth * 0.34);",
+    "    var strokeStartY = Math.round(proofHeight * 0.54);",
+    "    var strokeEndX = Math.round(proofWidth * 0.66);",
+    "    var strokeEndY = Math.round(proofHeight * 0.58);",
+    "    var strokeControlX = Math.round(proofWidth * 0.50);",
+    "    var strokeControlY = Math.round(proofHeight * 0.47);",
+    "    var safeInnerWidth = Math.max(120, proofWidth - 64);",
+    "    var svgText = '<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"' + proofWidth + '\" height=\"' + proofHeight + '\" viewBox=\"0 0 ' + proofWidth + ' ' + proofHeight + '\">';",
+    "    svgText += '<rect x=\"0\" y=\"0\" width=\"' + proofWidth + '\" height=\"' + proofHeight + '\" fill=\"none\" stroke=\"#0F766E\" stroke-width=\"12\" opacity=\"0.45\"/>';",
+    "    svgText += '<rect x=\"32\" y=\"32\" width=\"' + safeInnerWidth + '\" height=\"112\" fill=\"#ECFDF5\" stroke=\"#0F766E\" stroke-width=\"4\" opacity=\"0.88\"/>';",
+    "    svgText += '<text x=\"56\" y=\"78\" font-size=\"30\" fill=\"#134E4A\" font-family=\"Arial, sans-serif\">' + xmlText(handoffTitle) + '</text>';",
+    "    svgText += '<text x=\"56\" y=\"116\" font-size=\"20\" fill=\"#115E59\" font-family=\"Arial, sans-serif\">' + xmlText(handoffNote) + '</text>';",
+    "    svgText += '<path id=\"photoshop-visible-mouse-stroke\" d=\"M ' + strokeStartX + ' ' + strokeStartY + ' Q ' + strokeControlX + ' ' + strokeControlY + ' ' + strokeEndX + ' ' + strokeEndY + '\" fill=\"none\" stroke=\"#14B8A6\" stroke-width=\"14\" stroke-linecap=\"round\" opacity=\"0.82\"/>';",
+    "    svgText += '<circle cx=\"' + strokeStartX + '\" cy=\"' + strokeStartY + '\" r=\"18\" fill=\"#CCFBF1\" stroke=\"#0F766E\" stroke-width=\"5\" opacity=\"0.92\"/>';",
+    "    svgText += '<circle cx=\"' + strokeEndX + '\" cy=\"' + strokeEndY + '\" r=\"18\" fill=\"#CCFBF1\" stroke=\"#0F766E\" stroke-width=\"5\" opacity=\"0.92\"/>';",
+    "    svgText += '</svg>';",
+    "    writeText(outputSvgFile.fsName, svgText);",
+    "    var feedbackText = '{\"ok\":true,\"kind\":\"photoshop_project_commit\",\"prompt\":' + jsonString(" +
+      jsonLiteral(prompt) +
+      ") + ',\"passName\":' + jsonString(" +
+      jsonLiteral(passName) +
+      ") + ',\"inputPath\":' + jsonString(inputPath) + ',\"outputPngPath\":" +
+      jsonLiteral(command.outputPngPath) +
+      ",\"outputSvgPath\":" +
+      jsonLiteral(command.outputSvgPath) +
+      ",\"outputPsdPath\":" +
+      jsonLiteral(command.outputPsdPath) +
+      ",\"width\":' + proofWidth + ',\"height\":' + proofHeight + ',\"visibleMouseTrace\":{\"relativeStart\":[0.34,0.54],\"relativeEnd\":[0.66,0.58]},\"recommendedIllustratorAction\":' + jsonString('Place this post-mouse Photoshop SVG handoff as a named reference layer, then run the final Illustrator export.') + ',\"notes\":[' + jsonString(" +
+      jsonLiteral(note) +
+      ") + ']}';",
+    "    writeText(feedbackFile.fsName, feedbackText);",
+    closeDocument ? "    doc.close(SaveOptions.DONOTSAVECHANGES);" : "    // Keep the Photoshop document open after the visible mouse commit.",
+    closeDocument ? "    doc = null;" : "",
+    "    app.displayDialogs = previousDialogs;",
+    `    writeResult('{"ok":true,"jobId":${jsonLiteral(options.id)},"kind":"project_commit","inputPath":' + jsonString(inputPath) + ',"outputPngPath":${jsonLiteral(command.outputPngPath)},"outputSvgPath":${jsonLiteral(command.outputSvgPath)},"outputPsdPath":${jsonLiteral(command.outputPsdPath)},"feedbackPath":${jsonLiteral(command.feedbackPath)},"width":' + proofWidth + ',"height":' + proofHeight + ',"closed":${closeDocument ? "true" : "false"},"app":"Adobe Photoshop","version":' + jsonString(app.version) + '}');`,
     "  } catch (e) {",
     "    try { if (doc !== null) { doc.close(SaveOptions.DONOTSAVECHANGES); } } catch (closeError) {}",
     "    try { if (previousDialogs !== null) { app.displayDialogs = previousDialogs; } } catch (dialogError) {}",

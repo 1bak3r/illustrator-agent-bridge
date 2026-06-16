@@ -22,6 +22,7 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.ok(listed.tools.some((tool) => tool.name === "detect_illustrator_desktop"));
     assert.ok(listed.tools.some((tool) => tool.name === "probe_illustrator_communication"));
     assert.ok(listed.tools.some((tool) => tool.name === "drive_illustrator_mouse"));
+    assert.ok(listed.tools.some((tool) => tool.name === "drive_photoshop_mouse"));
     assert.ok(listed.tools.some((tool) => tool.name === "prepare_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "execute_cartoon_publication_workflow"));
     assert.ok(listed.tools.some((tool) => tool.name === "execute_adobe_svg_proof_workflow"));
@@ -96,6 +97,26 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.equal(mouseBody.ok, true);
     assert.equal(mouseBody.action, "dry-run");
     assert.match(mouseBody.stdout, /SetCursorPos/);
+
+    const photoshopMouseResult = await client.callTool({
+      name: "drive_photoshop_mouse",
+      arguments: {
+        platform: "wsl",
+        action: "drag",
+        x: 0.35,
+        y: 0.55,
+        toX: 0.65,
+        toY: 0.58,
+        toolShortcut: "b",
+        dryRun: true
+      }
+    });
+    const photoshopMouseContent = photoshopMouseResult.content as Array<{ type: string; text?: string }>;
+    const photoshopMouseBody = JSON.parse(photoshopMouseContent[0]?.text ?? "");
+    assert.equal(photoshopMouseBody.ok, true);
+    assert.equal(photoshopMouseBody.target, "photoshop");
+    assert.equal(photoshopMouseBody.action, "dry-run");
+    assert.match(photoshopMouseBody.stdout, /Photoshop/);
 
     const result = await client.callTool({
       name: "bridge_create_ping_job",
@@ -237,7 +258,8 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
         photoshopPlatform: "wsl",
         illustratorRunMode: "com",
         dryRun: true,
-        maxReviewIterations: 3
+        maxReviewIterations: 3,
+        visibleMouseProof: true
       }
     });
     const adobeProofContent = adobeProofResult.content as Array<{ type: string; text?: string }>;
@@ -262,19 +284,24 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
         photoshopPlatform: "wsl",
         illustratorRunMode: "com",
         dryRun: true,
-        maxReviewIterations: 3
+        maxReviewIterations: 3,
+        visibleMouseProof: true
       }
     });
     const adobeProjectContent = adobeProjectResult.content as Array<{ type: string; text?: string }>;
     const adobeProjectBody = JSON.parse(adobeProjectContent[0]?.text ?? "");
     assert.equal(adobeProjectBody.ok, true);
     assert.equal(adobeProjectBody.dryRun, true);
-    assert.equal(adobeProjectBody.workflow.runbook.length, 8);
-    assert.equal(adobeProjectBody.workflow.handoff.sequence.length, 5);
+    assert.equal(adobeProjectBody.workflow.runbook.length, 12);
+    assert.equal(adobeProjectBody.workflow.handoff.sequence.length, 7);
     assert.match(adobeProjectBody.workflow.photoshopHandoffSvgPath, /mcp-adobe-project\.photoshop-handoff\.svg$/);
     assert.equal(adobeProjectBody.workflow.handoff.illustratorConsumes, adobeProjectBody.workflow.photoshopHandoffSvgPath);
+    assert.match(adobeProjectBody.workflow.photoshopCommitJob.jobPath, /jobs\/.+\.jsx$/);
     assert.equal(adobeProjectBody.photoshopProjectLaunch.command.command, "powershell.exe");
+    assert.equal(adobeProjectBody.photoshopCommitLaunch.command.command, "powershell.exe");
     assert.equal(adobeProjectBody.illustratorReferenceLaunch.command.command, "powershell.exe");
+    assert.equal(adobeProjectBody.visibleMouseProofs.illustratorScene.action, "dry-run");
+    assert.equal(adobeProjectBody.visibleMouseProofs.photoshopEdit.target, "photoshop");
 
     const objectWorkflowResult = await client.callTool({
       name: "prepare_object_shape_workflow",

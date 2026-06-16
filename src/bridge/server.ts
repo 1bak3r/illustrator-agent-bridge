@@ -6,7 +6,7 @@ import { getGeneratedJobPaths, resolveBridgeRoot } from "./files.js";
 import { detectIllustratorApps, probeIllustratorCommunication, type IllustratorProbeMethod } from "./illustratorProbe.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
 import { LaunchJobError, launchJsxJob, resolveLaunchPlatform, type LaunchPlatform } from "./launcher.js";
-import { driveIllustratorMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./mouseAutomation.js";
+import { driveIllustratorMouse, drivePhotoshopMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./mouseAutomation.js";
 import { JobResultError, normalizeJobId, readJobStatus } from "./results.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./validation.js";
 import { OpenAiPlannerError } from "../planner/openAiCartoonPlanner.js";
@@ -129,6 +129,28 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       endRelativeY: optionalNumberBodyValue(body.toY, "toY"),
       durationMs: optionalNumberBodyValue(body.durationMs, "durationMs"),
       windowTitlePattern: optionalStringBodyValue(body.windowTitlePattern, "windowTitlePattern"),
+      toolShortcut: optionalStringBodyValue(body.toolShortcut, "toolShortcut"),
+      toolShortcutDelayMs: optionalNumberBodyValue(body.toolShortcutDelayMs, "toolShortcutDelayMs"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun")
+    });
+    writeJson(response, 201, result);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/photoshop/mouse") {
+    const body = objectBody(await readOptionalJson(request));
+    const result = await drivePhotoshopMouse({
+      platform: resolveLaunchPlatform(optionalLaunchPlatform(body.platform)),
+      action: optionalMouseAction(body.action),
+      button: optionalMouseButton(body.button),
+      relativeX: optionalNumberBodyValue(body.x, "x"),
+      relativeY: optionalNumberBodyValue(body.y, "y"),
+      endRelativeX: optionalNumberBodyValue(body.toX, "toX"),
+      endRelativeY: optionalNumberBodyValue(body.toY, "toY"),
+      durationMs: optionalNumberBodyValue(body.durationMs, "durationMs"),
+      windowTitlePattern: optionalStringBodyValue(body.windowTitlePattern, "windowTitlePattern"),
+      toolShortcut: optionalStringBodyValue(body.toolShortcut, "toolShortcut"),
+      toolShortcutDelayMs: optionalNumberBodyValue(body.toolShortcutDelayMs, "toolShortcutDelayMs"),
       dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun")
     });
     writeJson(response, 201, result);
@@ -403,6 +425,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
       referenceOpacity: optionalNumberBodyValue(body.referenceOpacity, "referenceOpacity"),
       embedReference: optionalBooleanBodyValue(body.embedReference, "embedReference"),
+      visibleMouseProof: optionalBooleanBodyValue(body.visibleMouseProof, "visibleMouseProof"),
       root
     });
     writeJson(response, 201, workflow);
@@ -430,6 +453,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
       referenceOpacity: optionalNumberBodyValue(body.referenceOpacity, "referenceOpacity"),
       embedReference: optionalBooleanBodyValue(body.embedReference, "embedReference"),
+      visibleMouseProof: optionalBooleanBodyValue(body.visibleMouseProof, "visibleMouseProof"),
+      visibleMouseDurationMs: optionalNumberBodyValue(body.visibleMouseDurationMs, "visibleMouseDurationMs"),
+      illustratorMouseToolShortcut: optionalStringBodyValue(body.illustratorMouseToolShortcut, "illustratorMouseToolShortcut"),
+      photoshopMouseToolShortcut: optionalStringBodyValue(body.photoshopMouseToolShortcut, "photoshopMouseToolShortcut"),
+      illustratorMouseWindowTitlePattern: optionalStringBodyValue(body.illustratorMouseWindowTitlePattern, "illustratorMouseWindowTitlePattern"),
+      photoshopMouseWindowTitlePattern: optionalStringBodyValue(body.photoshopMouseWindowTitlePattern, "photoshopMouseWindowTitlePattern"),
       launchPlatform: optionalLaunchPlatform(body.platform),
       appPath: optionalStringBodyValue(body.appPath, "appPath"),
       illustratorRunMode: optionalAdobeSvgProofRunMode(body.illustratorRunMode),

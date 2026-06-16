@@ -42,6 +42,17 @@ function toHostCommand(command: PhotoshopCommand, hostPlatform?: AdobeHostPlatfo
     };
   }
 
+  if (command.kind === "project_commit") {
+    return {
+      ...command,
+      inputPath: command.inputPath ? toAdobeHostPath(resolvePath(command.inputPath), hostPlatform) : undefined,
+      outputPngPath: toAdobeHostPath(resolvePath(command.outputPngPath), hostPlatform),
+      outputSvgPath: toAdobeHostPath(resolvePath(command.outputSvgPath), hostPlatform),
+      outputPsdPath: toAdobeHostPath(resolvePath(command.outputPsdPath), hostPlatform),
+      feedbackPath: toAdobeHostPath(resolvePath(command.feedbackPath), hostPlatform)
+    };
+  }
+
   if (command.kind === "svg_proof") {
     return {
       ...command,

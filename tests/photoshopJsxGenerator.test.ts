@@ -70,7 +70,8 @@ test("generates a Photoshop project pass with PSD, PNG, SVG, and feedback artifa
       prompt: "scientific concept figure",
       passName: "texture and contrast pass",
       width: 1200,
-      height: 800
+      height: 800,
+      keepOpen: true
     },
     { id: "photoshop-project-pass-1", resultPath: "C:/Users/example/out/result.json" }
   );
@@ -84,5 +85,33 @@ test("generates a Photoshop project pass with PSD, PNG, SVG, and feedback artifa
   assert.match(jsx, /project-feedback\.json/);
   assert.match(jsx, /"kind":"project_pass"/);
   assert.match(jsx, /writeText\(outputSvgFile\.fsName, svgText\)/);
+  assert.match(jsx, /Keep the Photoshop document open for a visible mouse edit pass/);
+  assert.doesNotMatch(jsx, /\n    doc\.close\(SaveOptions\.DONOTSAVECHANGES\);\n/);
   assert.match(jsx, /photoshop_project_pass/);
+});
+
+test("generates a Photoshop post-mouse project commit with SVG handoff trace", () => {
+  const jsx = generatePhotoshopJsx(
+    {
+      kind: "project_commit",
+      inputPath: "C:/Users/example/out/source.svg",
+      outputPngPath: "C:/Users/example/out/project-reference.png",
+      outputSvgPath: "C:/Users/example/out/project-handoff.svg",
+      outputPsdPath: "C:/Users/example/out/project-working.psd",
+      feedbackPath: "C:/Users/example/out/project-feedback.json",
+      prompt: "scientific concept figure",
+      passName: "visible mouse commit"
+    },
+    { id: "photoshop-project-commit-1", resultPath: "C:/Users/example/out/result.json" }
+  );
+
+  assert.match(jsx, /#target photoshop/);
+  assert.match(jsx, /app\.activeDocument/);
+  assert.match(jsx, /PhotoshopSaveOptions/);
+  assert.match(jsx, /PNGSaveOptions/);
+  assert.match(jsx, /photoshop-visible-mouse-stroke/);
+  assert.match(jsx, /visibleMouseTrace/);
+  assert.match(jsx, /"kind":"project_commit"/);
+  assert.match(jsx, /photoshop_project_commit/);
+  assert.match(jsx, /doc\.close\(SaveOptions\.DONOTSAVECHANGES\)/);
 });

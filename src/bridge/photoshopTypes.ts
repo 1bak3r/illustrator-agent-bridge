@@ -1,4 +1,8 @@
-export type PhotoshopCommand = PhotoshopPingCommand | PhotoshopSvgProofCommand | PhotoshopProjectPassCommand;
+export type PhotoshopCommand =
+  | PhotoshopPingCommand
+  | PhotoshopSvgProofCommand
+  | PhotoshopProjectPassCommand
+  | PhotoshopProjectCommitCommand;
 
 export interface PhotoshopPingCommand {
   kind: "ping";
@@ -26,6 +30,19 @@ export interface PhotoshopProjectPassCommand {
   width?: number;
   height?: number;
   resolution?: number;
+  keepOpen?: boolean;
+}
+
+export interface PhotoshopProjectCommitCommand {
+  kind: "project_commit";
+  inputPath?: string;
+  outputPngPath: string;
+  outputSvgPath: string;
+  outputPsdPath: string;
+  feedbackPath: string;
+  prompt?: string;
+  passName?: string;
+  closeDocument?: boolean;
 }
 
 export interface GeneratedPhotoshopJob {

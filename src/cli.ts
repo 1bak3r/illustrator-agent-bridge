@@ -7,7 +7,7 @@ import { detectIllustratorApps, probeIllustratorCommunication, type IllustratorP
 import { createGeneratedJob } from "./bridge/jobs.js";
 import { generatedJobSummary } from "./bridge/jsxGenerator.js";
 import { LaunchJobError, launchJsxJob, resolveLaunchPlatform, type LaunchPlatform } from "./bridge/launcher.js";
-import { driveIllustratorMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./bridge/mouseAutomation.js";
+import { driveIllustratorMouse, drivePhotoshopMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./bridge/mouseAutomation.js";
 import { runJsxViaPhotoshopCom } from "./bridge/photoshopComAutomation.js";
 import { createGeneratedPhotoshopJob } from "./bridge/photoshopJobs.js";
 import { generatedPhotoshopJobSummary } from "./bridge/photoshopJsxGenerator.js";
@@ -70,6 +70,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "illustrator:mouse":
       await illustratorMouse(rest);
+      return;
+    case "photoshop:mouse":
+      await photoshopMouse(rest);
       return;
     case "plan:cartoon":
       await planCartoon(rest);
@@ -291,6 +294,26 @@ async function illustratorMouse(args: string[]): Promise<void> {
     endRelativeY: optionValue(options, "to-y") ? Number(optionValue(options, "to-y")) : undefined,
     durationMs: optionValue(options, "duration-ms") ? Number(optionValue(options, "duration-ms")) : undefined,
     windowTitlePattern: optionValue(options, "window-title"),
+    toolShortcut: optionValue(options, "tool-shortcut"),
+    dryRun: flagValue(options, "dry-run")
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function photoshopMouse(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const platform = resolveLaunchPlatform(optionalLaunchPlatform(optionValue(options, "platform")));
+  const result = await drivePhotoshopMouse({
+    platform,
+    action: optionalMouseAction(optionValue(options, "action")),
+    button: optionalMouseButton(optionValue(options, "button")),
+    relativeX: optionValue(options, "x") ? Number(optionValue(options, "x")) : undefined,
+    relativeY: optionValue(options, "y") ? Number(optionValue(options, "y")) : undefined,
+    endRelativeX: optionValue(options, "to-x") ? Number(optionValue(options, "to-x")) : undefined,
+    endRelativeY: optionValue(options, "to-y") ? Number(optionValue(options, "to-y")) : undefined,
+    durationMs: optionValue(options, "duration-ms") ? Number(optionValue(options, "duration-ms")) : undefined,
+    windowTitlePattern: optionValue(options, "window-title"),
+    toolShortcut: optionValue(options, "tool-shortcut"),
     dryRun: flagValue(options, "dry-run")
   });
   console.log(JSON.stringify(result, null, 2));
@@ -816,7 +839,8 @@ async function workflowAdobeProject(args: string[]): Promise<void> {
     proofHeight: optionValue(options, "proof-height") ? Number(optionValue(options, "proof-height")) : undefined,
     proofResolution: optionValue(options, "proof-resolution") ? Number(optionValue(options, "proof-resolution")) : undefined,
     referenceOpacity: optionValue(options, "reference-opacity") ? Number(optionValue(options, "reference-opacity")) : undefined,
-    embedReference: flagValue(options, "embed-reference")
+    embedReference: flagValue(options, "embed-reference"),
+    visibleMouseProof: flagValue(options, "visible-mouse-proof")
   });
 
   console.log(JSON.stringify(workflow, null, 2));
@@ -857,6 +881,12 @@ async function workflowExecuteAdobeProject(args: string[]): Promise<void> {
     proofResolution: optionValue(options, "proof-resolution") ? Number(optionValue(options, "proof-resolution")) : undefined,
     referenceOpacity: optionValue(options, "reference-opacity") ? Number(optionValue(options, "reference-opacity")) : undefined,
     embedReference: flagValue(options, "embed-reference"),
+    visibleMouseProof: flagValue(options, "visible-mouse-proof"),
+    visibleMouseDurationMs: optionValue(options, "visible-mouse-duration-ms") ? Number(optionValue(options, "visible-mouse-duration-ms")) : undefined,
+    illustratorMouseToolShortcut: optionValue(options, "illustrator-mouse-tool"),
+    photoshopMouseToolShortcut: optionValue(options, "photoshop-mouse-tool"),
+    illustratorMouseWindowTitlePattern: optionValue(options, "illustrator-mouse-window-title"),
+    photoshopMouseWindowTitlePattern: optionValue(options, "photoshop-mouse-window-title"),
     launchPlatform: optionalLaunchPlatform(optionValue(options, "platform")),
     appPath: optionValue(options, "app"),
     illustratorRunMode: optionalAdobeSvgProofRunMode(optionValue(options, "illustrator-run-mode")),
@@ -968,6 +998,7 @@ const flagOptions = new Set([
   "draw-circle",
   "draw-complex",
   "mouse-proof",
+  "visible-mouse-proof",
   "embed-reference"
 ]);
 
@@ -1080,7 +1111,8 @@ Commands:
   photoshop:proof-svg SVG_PATH --output PNG_PATH [--width N] [--height N] [--resolution N] [--root DIR]
   illustrator:detect [--platform auto|macos|windows|wsl|linux]
   illustrator:probe [--platform auto|macos|windows|wsl|linux] [--method auto|desktop|com] [--app PATH_OR_NAME] [--dry-run] [--wait] [--auto-confirm-dialog] [--draw-circle] [--draw-complex] [--mouse-proof] [--mouse-action move|click|double-click|drag] [--timeout-ms N] [--dialog-timeout-ms N] [--root DIR]
-  illustrator:mouse [--platform windows|wsl] [--action move|click|double-click|drag] [--button left|right] [--x 0.5] [--y 0.5] [--to-x 0.7] [--to-y 0.5] [--duration-ms N] [--window-title REGEX] [--dry-run]
+  illustrator:mouse [--platform windows|wsl] [--action move|click|double-click|drag] [--button left|right] [--x 0.5] [--y 0.5] [--to-x 0.7] [--to-y 0.5] [--duration-ms N] [--tool-shortcut TEXT] [--window-title REGEX] [--dry-run]
+  photoshop:mouse [--platform windows|wsl] [--action move|click|double-click|drag] [--button left|right] [--x 0.5] [--y 0.5] [--to-x 0.7] [--to-y 0.5] [--duration-ms N] [--tool-shortcut TEXT] [--window-title REGEX] [--dry-run]
   plan:cartoon PROMPT [--width N] [--height N] [--title TEXT] [--planner deterministic|auto|openai] [--model MODEL] [--root DIR] [--corpus PATH]
   plan:scientific PROMPT [--width N] [--height N] [--title TEXT] [--evidence-limit N] [--root DIR] [--corpus PATH]
   plan:object PROMPT [--width N] [--height N] [--title TEXT] [--evidence-limit N] [--root DIR] [--corpus PATH]
@@ -1089,8 +1121,8 @@ Commands:
   workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--planner deterministic|auto|openai] [--model MODEL] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   workflow:adobe-svg-proof PROMPT --output SVG_PATH [--proof-output PNG_PATH] [--intent auto|cartoon|scientific|object] [--planner deterministic|auto|openai] [--proof-width N] [--proof-height N] [--proof-resolution N] [--root DIR] [--corpus PATH]
   workflow:execute-adobe-svg-proof PROMPT --output SVG_PATH [--proof-output PNG_PATH] [--intent auto|cartoon|scientific|object] [--illustrator-run-mode launch|com] [--max-review-iterations N] [--platform auto|macos|windows|wsl|linux] [--photoshop-platform auto|windows|wsl] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--root DIR] [--corpus PATH]
-  workflow:adobe-project PROMPT --output SVG_PATH [--source-svg SVG_PATH] [--photoshop-reference PNG_PATH] [--photoshop-handoff-svg SVG_PATH] [--photoshop-working-psd PSD_PATH] [--photoshop-feedback JSON_PATH] [--intent auto|cartoon|scientific|object] [--reference-opacity N] [--embed-reference] [--root DIR] [--corpus PATH]
-  workflow:execute-adobe-project PROMPT --output SVG_PATH [--source-svg SVG_PATH] [--photoshop-reference PNG_PATH] [--photoshop-handoff-svg SVG_PATH] [--photoshop-working-psd PSD_PATH] [--photoshop-feedback JSON_PATH] [--intent auto|cartoon|scientific|object] [--illustrator-run-mode launch|com] [--max-review-iterations N] [--reference-opacity N] [--embed-reference] [--platform auto|macos|windows|wsl|linux] [--photoshop-platform auto|windows|wsl] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--root DIR] [--corpus PATH]
+  workflow:adobe-project PROMPT --output SVG_PATH [--source-svg SVG_PATH] [--photoshop-reference PNG_PATH] [--photoshop-handoff-svg SVG_PATH] [--photoshop-working-psd PSD_PATH] [--photoshop-feedback JSON_PATH] [--intent auto|cartoon|scientific|object] [--reference-opacity N] [--embed-reference] [--visible-mouse-proof] [--root DIR] [--corpus PATH]
+  workflow:execute-adobe-project PROMPT --output SVG_PATH [--source-svg SVG_PATH] [--photoshop-reference PNG_PATH] [--photoshop-handoff-svg SVG_PATH] [--photoshop-working-psd PSD_PATH] [--photoshop-feedback JSON_PATH] [--intent auto|cartoon|scientific|object] [--illustrator-run-mode launch|com] [--max-review-iterations N] [--reference-opacity N] [--embed-reference] [--visible-mouse-proof] [--visible-mouse-duration-ms N] [--illustrator-mouse-tool TEXT] [--photoshop-mouse-tool TEXT] [--platform auto|macos|windows|wsl|linux] [--photoshop-platform auto|windows|wsl] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--root DIR] [--corpus PATH]
   workflow:object PROMPT --output PATH [--format pdf|svg|png|jpg] [--max-guard-iterations N] [--root DIR] [--corpus PATH]
   workflow:execute-object PROMPT --output PATH [--format pdf|svg|png|jpg] [--run-mode launch|com] [--max-guard-iterations N] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   job:status JOB_ID [--root DIR]

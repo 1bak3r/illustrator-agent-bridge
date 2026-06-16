@@ -4,6 +4,7 @@ import { runJsxViaIllustratorCom } from "../bridge/comAutomation.js";
 import { createGeneratedJob } from "../bridge/jobs.js";
 import { generatedJobSummary } from "../bridge/jsxGenerator.js";
 import { launchJsxJob, resolveLaunchPlatform, type LaunchJobResult, type LaunchPlatform } from "../bridge/launcher.js";
+import { driveIllustratorMouse, drivePhotoshopMouse, type DriveAdobeMouseResult } from "../bridge/mouseAutomation.js";
 import { runJsxViaPhotoshopCom } from "../bridge/photoshopComAutomation.js";
 import { createGeneratedPhotoshopJob } from "../bridge/photoshopJobs.js";
 import { generatedPhotoshopJobSummary } from "../bridge/photoshopJsxGenerator.js";
@@ -29,6 +30,7 @@ export interface PrepareAdobeProjectWorkflowOptions extends PrepareAdobeSvgProof
   photoshopFeedbackPath?: string;
   referenceOpacity?: number;
   embedReference?: boolean;
+  visibleMouseProof?: boolean;
 }
 
 export interface AdobeProjectWorkflow {
@@ -45,6 +47,7 @@ export interface AdobeProjectWorkflow {
   sceneJob: ReturnType<typeof generatedJobSummary>;
   sourceExportJob: ReturnType<typeof generatedJobSummary>;
   photoshopProjectJob: ReturnType<typeof generatedPhotoshopJobSummary>;
+  photoshopCommitJob?: ReturnType<typeof generatedPhotoshopJobSummary>;
   illustratorReferenceJob: ReturnType<typeof generatedJobSummary>;
   finalExportJob: ReturnType<typeof generatedJobSummary>;
   handoff: AdobeProjectHandoff;
@@ -92,6 +95,12 @@ export interface ExecuteAdobeProjectWorkflowOptions extends PrepareAdobeProjectW
   proofMinHeight?: number;
   proofMinNonBlankRatio?: number;
   maxReviewIterations?: number;
+  visibleMouseProof?: boolean;
+  visibleMouseDurationMs?: number;
+  illustratorMouseToolShortcut?: string;
+  photoshopMouseToolShortcut?: string;
+  illustratorMouseWindowTitlePattern?: string;
+  photoshopMouseWindowTitlePattern?: string;
 }
 
 export interface AdobeProjectReviewIteration {
@@ -105,7 +114,14 @@ export interface AdobeProjectReviewIteration {
   photoshopHandoffQaOk?: boolean;
   finalExportQaOk?: boolean;
   artworkReviewOk?: boolean;
+  visibleMouseOk?: boolean;
   nextGoalPrompt: string | null;
+}
+
+export interface AdobeProjectVisibleMouseProofs {
+  illustratorScene?: DriveAdobeMouseResult;
+  photoshopEdit?: DriveAdobeMouseResult;
+  illustratorReturn?: DriveAdobeMouseResult;
 }
 
 export interface AdobeProjectWorkflowExecution {
@@ -121,6 +137,8 @@ export interface AdobeProjectWorkflowExecution {
   sourceExportQa?: ExportQaReport;
   photoshopProjectLaunch?: LaunchJobResult;
   photoshopProjectResult?: JobStatus;
+  photoshopCommitLaunch?: LaunchJobResult;
+  photoshopCommitResult?: JobStatus;
   photoshopReferenceQa?: ExportQaReport;
   photoshopHandoffQa?: ExportQaReport;
   photoshopFeedback?: Record<string, unknown>;
@@ -129,6 +147,7 @@ export interface AdobeProjectWorkflowExecution {
   finalExportLaunch?: LaunchJobResult;
   finalExportResult?: JobStatus;
   finalExportQa?: ExportQaReport;
+  visibleMouseProofs?: AdobeProjectVisibleMouseProofs;
   artworkReview?: ArtworkReviewReport;
   reviewIterations: AdobeProjectReviewIteration[];
   next: string[];
@@ -169,10 +188,27 @@ export async function prepareAdobeProjectWorkflow(options: PrepareAdobeProjectWo
       passName: "Photoshop project pass",
       width: options.proofWidth,
       height: options.proofHeight,
-      resolution: options.proofResolution
+      resolution: options.proofResolution,
+      keepOpen: Boolean(options.visibleMouseProof)
     },
     options.root
   );
+  const photoshopCommitJob = options.visibleMouseProof
+    ? await createGeneratedPhotoshopJob(
+        {
+          kind: "project_commit",
+          inputPath: sourceSvgPath,
+          outputPngPath: photoshopReferencePngPath,
+          outputSvgPath: photoshopHandoffSvgPath,
+          outputPsdPath: photoshopWorkingPsdPath,
+          feedbackPath: photoshopFeedbackPath,
+          prompt: planned.plan.prompt,
+          passName: "Photoshop visible mouse commit",
+          closeDocument: true
+        },
+        options.root
+      )
+    : undefined;
   const illustratorReferenceJob = await createGeneratedJob(
     {
       kind: "place_file_reference",
@@ -212,15 +248,20 @@ export async function prepareAdobeProjectWorkflow(options: PrepareAdobeProjectWo
     sceneJob: generatedJobSummary(sceneJob),
     sourceExportJob: generatedJobSummary(sourceExportJob),
     photoshopProjectJob: generatedPhotoshopJobSummary(photoshopProjectJob),
+    photoshopCommitJob: photoshopCommitJob ? generatedPhotoshopJobSummary(photoshopCommitJob) : undefined,
     illustratorReferenceJob: generatedJobSummary(illustratorReferenceJob),
     finalExportJob: generatedJobSummary(finalExportJob),
     handoff: {
       sourceOfTruth: "illustrator-vector-document",
       sequence: [
         "Illustrator creates editable vector scene",
+        ...(options.visibleMouseProof ? ["Illustrator receives a visible mouse drawing pass before source SVG export"] : []),
         "Illustrator exports source SVG",
-        "Photoshop opens SVG and saves layered PSD, PNG preview, and SVG handoff",
+        options.visibleMouseProof
+          ? "Photoshop opens SVG, keeps the document active, receives a visible mouse edit, and commits PSD, PNG preview, feedback JSON, and SVG handoff"
+          : "Photoshop opens SVG and saves layered PSD, PNG preview, and SVG handoff",
         "Illustrator places Photoshop SVG handoff as a named reference layer",
+        ...(options.visibleMouseProof ? ["Illustrator receives a visible mouse return pass before final SVG export"] : []),
         "Illustrator exports final project SVG"
       ],
       photoshopArtifacts: {
@@ -231,14 +272,23 @@ export async function prepareAdobeProjectWorkflow(options: PrepareAdobeProjectWo
       },
       illustratorConsumes: photoshopHandoffSvgPath
     },
-    runbook: buildRunbook(sceneJob, sourceExportJob, photoshopProjectJob, illustratorReferenceJob, finalExportJob, {
-      outputPath,
-      sourceSvgPath,
-      photoshopReferencePngPath,
-      photoshopHandoffSvgPath,
-      photoshopWorkingPsdPath,
-      photoshopFeedbackPath
-    })
+    runbook: buildRunbook(
+      sceneJob,
+      sourceExportJob,
+      photoshopProjectJob,
+      photoshopCommitJob,
+      illustratorReferenceJob,
+      finalExportJob,
+      {
+        outputPath,
+        sourceSvgPath,
+        photoshopReferencePngPath,
+        photoshopHandoffSvgPath,
+        photoshopWorkingPsdPath,
+        photoshopFeedbackPath
+      },
+      Boolean(options.visibleMouseProof)
+    )
   };
 }
 
@@ -277,6 +327,7 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
   const illustratorRunMode = options.illustratorRunMode ?? "launch";
   const waitForResults = !dryRun && (options.waitForResults ?? true);
   const workflow = await prepareAdobeProjectWorkflow(options);
+  const visibleMouseProofs: AdobeProjectVisibleMouseProofs | undefined = options.visibleMouseProof ? {} : undefined;
 
   if (isObjectPlan(workflow.plan) && !workflow.plan.guard.ok) {
     return {
@@ -301,6 +352,21 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
       { dryRun, illustratorRunMode, workflow, sceneLaunch, sceneResult },
       "Fix the Illustrator scene job failure before exporting the source SVG."
     );
+  }
+
+  if (visibleMouseProofs) {
+    visibleMouseProofs.illustratorScene = await runIllustratorVisibleMouseProof(options, {
+      relativeX: 0.24,
+      relativeY: 0.46,
+      endRelativeX: 0.58,
+      endRelativeY: 0.46
+    });
+    if (!visibleMouseProofs.illustratorScene.ok) {
+      return failure(
+        { dryRun, illustratorRunMode, workflow, sceneLaunch, sceneResult, visibleMouseProofs },
+        "Fix the visible Illustrator mouse drawing pass before exporting the source SVG."
+      );
+    }
   }
 
   const sourceExportLaunch = await runIllustratorWorkflowJob(workflow.sourceExportJob.jobPath, illustratorRunMode, options);
@@ -374,6 +440,97 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
     );
   }
 
+  let photoshopCommitLaunch: LaunchJobResult | undefined;
+  let photoshopCommitResult: JobStatus | undefined;
+
+  if (visibleMouseProofs) {
+    visibleMouseProofs.photoshopEdit = await runPhotoshopVisibleMouseProof(options);
+    if (!visibleMouseProofs.photoshopEdit.ok) {
+      return failure(
+        {
+          dryRun,
+          illustratorRunMode,
+          workflow,
+          sceneLaunch,
+          sceneResult,
+          sourceExportLaunch,
+          sourceExportResult,
+          sourceExportQa,
+          photoshopProjectLaunch,
+          photoshopProjectResult,
+          visibleMouseProofs
+        },
+        "Fix the visible Photoshop mouse edit pass before returning the SVG handoff to Illustrator."
+      );
+    }
+
+    if (!workflow.photoshopCommitJob) {
+      return failure(
+        {
+          dryRun,
+          illustratorRunMode,
+          workflow,
+          sceneLaunch,
+          sceneResult,
+          sourceExportLaunch,
+          sourceExportResult,
+          sourceExportQa,
+          photoshopProjectLaunch,
+          photoshopProjectResult,
+          visibleMouseProofs
+        },
+        "Fix the workflow preparation failure: visible mouse proof requires a Photoshop post-mouse commit job."
+      );
+    }
+
+    photoshopCommitLaunch = await runJsxViaPhotoshopCom(workflow.photoshopCommitJob.jobPath, {
+      platform: resolveLaunchPlatform(options.photoshopPlatform ?? options.launchPlatform),
+      dryRun,
+      root: options.root
+    });
+    if (!photoshopCommitLaunch.ok) {
+      return failure(
+        {
+          dryRun,
+          illustratorRunMode,
+          workflow,
+          sceneLaunch,
+          sceneResult,
+          sourceExportLaunch,
+          sourceExportResult,
+          sourceExportQa,
+          photoshopProjectLaunch,
+          photoshopProjectResult,
+          visibleMouseProofs,
+          photoshopCommitLaunch
+        },
+        "Fix the Photoshop post-mouse SVG handoff commit launch failure before returning the artwork to Illustrator."
+      );
+    }
+
+    photoshopCommitResult = waitForResults ? await waitForJob(workflow.photoshopCommitJob.id, options) : undefined;
+    if (photoshopCommitResult?.result?.ok === false) {
+      return failure(
+        {
+          dryRun,
+          illustratorRunMode,
+          workflow,
+          sceneLaunch,
+          sceneResult,
+          sourceExportLaunch,
+          sourceExportResult,
+          sourceExportQa,
+          photoshopProjectLaunch,
+          photoshopProjectResult,
+          visibleMouseProofs,
+          photoshopCommitLaunch,
+          photoshopCommitResult
+        },
+        "Fix the Photoshop post-mouse SVG handoff commit job failure before returning the artwork to Illustrator."
+      );
+    }
+  }
+
   const photoshopReferenceQa =
     waitForResults && !options.skipQa
       ? await inspectExportArtifact(workflow.photoshopReferencePngPath, {
@@ -397,6 +554,8 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         sourceExportQa,
         photoshopProjectLaunch,
         photoshopProjectResult,
+        photoshopCommitLaunch,
+        photoshopCommitResult,
         photoshopReferenceQa
       },
       "Fix the Photoshop PNG preview QA failure before placing the Photoshop SVG handoff back into Illustrator."
@@ -423,6 +582,8 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         sourceExportQa,
         photoshopProjectLaunch,
         photoshopProjectResult,
+        photoshopCommitLaunch,
+        photoshopCommitResult,
         photoshopReferenceQa,
         photoshopHandoffQa
       },
@@ -446,6 +607,8 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         sourceExportQa,
         photoshopProjectLaunch,
         photoshopProjectResult,
+        photoshopCommitLaunch,
+        photoshopCommitResult,
         photoshopReferenceQa,
         photoshopHandoffQa,
         photoshopFeedback,
@@ -469,6 +632,8 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         sourceExportQa,
         photoshopProjectLaunch,
         photoshopProjectResult,
+        photoshopCommitLaunch,
+        photoshopCommitResult,
         photoshopReferenceQa,
         photoshopHandoffQa,
         photoshopFeedback,
@@ -477,6 +642,40 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
       },
       "Fix the Illustrator reference placement job failure before final export."
     );
+  }
+
+  if (visibleMouseProofs) {
+    visibleMouseProofs.illustratorReturn = await runIllustratorVisibleMouseProof(options, {
+      relativeX: 0.32,
+      relativeY: 0.62,
+      endRelativeX: 0.68,
+      endRelativeY: 0.58
+    });
+    if (!visibleMouseProofs.illustratorReturn.ok) {
+      return failure(
+        {
+          dryRun,
+          illustratorRunMode,
+          workflow,
+          sceneLaunch,
+          sceneResult,
+          sourceExportLaunch,
+          sourceExportResult,
+          sourceExportQa,
+          photoshopProjectLaunch,
+          photoshopProjectResult,
+          photoshopCommitLaunch,
+          photoshopCommitResult,
+          photoshopReferenceQa,
+          photoshopHandoffQa,
+          photoshopFeedback,
+          illustratorReferenceLaunch,
+          illustratorReferenceResult,
+          visibleMouseProofs
+        },
+        "Fix the visible Illustrator mouse return-pass drawing before final SVG export."
+      );
+    }
   }
 
   const finalExportLaunch = await runIllustratorWorkflowJob(workflow.finalExportJob.jobPath, illustratorRunMode, options);
@@ -493,11 +692,14 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         sourceExportQa,
         photoshopProjectLaunch,
         photoshopProjectResult,
+        photoshopCommitLaunch,
+        photoshopCommitResult,
         photoshopReferenceQa,
         photoshopHandoffQa,
         photoshopFeedback,
         illustratorReferenceLaunch,
         illustratorReferenceResult,
+        visibleMouseProofs,
         finalExportLaunch
       },
       "Fix the Illustrator final SVG export launch failure."
@@ -518,12 +720,15 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         sourceExportQa,
         photoshopProjectLaunch,
         photoshopProjectResult,
+        photoshopCommitLaunch,
+        photoshopCommitResult,
         photoshopReferenceQa,
         photoshopHandoffQa,
         photoshopFeedback,
         illustratorReferenceLaunch,
         illustratorReferenceResult,
         finalExportLaunch,
+        visibleMouseProofs,
         finalExportResult
       },
       "Fix the Illustrator final SVG export job failure."
@@ -553,17 +758,20 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
       sceneLaunch.ok &&
       sourceExportLaunch.ok &&
       photoshopProjectLaunch.ok &&
+      (photoshopCommitLaunch?.ok ?? true) &&
       illustratorReferenceLaunch.ok &&
       finalExportLaunch.ok &&
       (sceneResult?.result?.ok ?? true) &&
       (sourceExportResult?.result?.ok ?? true) &&
       (photoshopProjectResult?.result?.ok ?? true) &&
+      (photoshopCommitResult?.result?.ok ?? true) &&
       (illustratorReferenceResult?.result?.ok ?? true) &&
       (finalExportResult?.result?.ok ?? true) &&
       (sourceExportQa?.ok ?? true) &&
       (photoshopReferenceQa?.ok ?? true) &&
       (photoshopHandoffQa?.ok ?? true) &&
       (finalExportQa?.ok ?? true) &&
+      visibleMouseProofsOk(visibleMouseProofs, Boolean(options.visibleMouseProof)) &&
       artworkReviewClean,
     dryRun,
     illustratorRunMode,
@@ -576,6 +784,8 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
     sourceExportQa,
     photoshopProjectLaunch,
     photoshopProjectResult,
+    photoshopCommitLaunch,
+    photoshopCommitResult,
     photoshopReferenceQa,
     photoshopHandoffQa,
     photoshopFeedback,
@@ -584,12 +794,14 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
     finalExportLaunch,
     finalExportResult,
     finalExportQa,
+    visibleMouseProofs,
     artworkReview,
     reviewIterations: [],
     next: nextSteps(dryRun, waitForResults, Boolean(options.skipQa), {
       sceneLaunch,
       sourceExportLaunch,
       photoshopProjectLaunch,
+      photoshopCommitLaunch,
       illustratorReferenceLaunch,
       finalExportLaunch,
       artworkReview
@@ -640,6 +852,49 @@ async function waitForJob(jobId: string, options: ExecuteAdobeProjectWorkflowOpt
   });
 }
 
+async function runIllustratorVisibleMouseProof(
+  options: ExecuteAdobeProjectWorkflowOptions,
+  points: { relativeX: number; relativeY: number; endRelativeX: number; endRelativeY: number }
+): Promise<DriveAdobeMouseResult> {
+  return driveIllustratorMouse({
+    platform: resolveLaunchPlatform(options.launchPlatform),
+    action: "drag",
+    button: "left",
+    relativeX: points.relativeX,
+    relativeY: points.relativeY,
+    endRelativeX: points.endRelativeX,
+    endRelativeY: points.endRelativeY,
+    durationMs: options.visibleMouseDurationMs ?? 1200,
+    toolShortcut: options.illustratorMouseToolShortcut ?? "\\",
+    windowTitlePattern: options.illustratorMouseWindowTitlePattern,
+    dryRun: options.dryRun
+  });
+}
+
+async function runPhotoshopVisibleMouseProof(options: ExecuteAdobeProjectWorkflowOptions): Promise<DriveAdobeMouseResult> {
+  return drivePhotoshopMouse({
+    platform: resolveLaunchPlatform(options.photoshopPlatform ?? options.launchPlatform),
+    action: "drag",
+    button: "left",
+    relativeX: 0.34,
+    relativeY: 0.54,
+    endRelativeX: 0.66,
+    endRelativeY: 0.58,
+    durationMs: options.visibleMouseDurationMs ?? 1200,
+    toolShortcut: options.photoshopMouseToolShortcut ?? "b",
+    windowTitlePattern: options.photoshopMouseWindowTitlePattern,
+    dryRun: options.dryRun
+  });
+}
+
+function visibleMouseProofsOk(proofs: AdobeProjectVisibleMouseProofs | undefined, required: boolean): boolean {
+  if (!required) {
+    return true;
+  }
+
+  return Boolean(proofs?.illustratorScene?.ok && proofs.photoshopEdit?.ok && proofs.illustratorReturn?.ok);
+}
+
 function buildRunbook(
   sceneJob: GeneratedJob,
   sourceExportJob: GeneratedJob,
@@ -650,6 +905,15 @@ function buildRunbook(
     photoshopJobPath: string;
     photoshopResultPath: string;
   },
+  photoshopCommitJob:
+    | {
+        id: string;
+        jobPath: string;
+        resultPath: string;
+        photoshopJobPath: string;
+        photoshopResultPath: string;
+      }
+    | undefined,
   illustratorReferenceJob: GeneratedJob,
   finalExportJob: GeneratedJob,
   paths: {
@@ -659,20 +923,30 @@ function buildRunbook(
     photoshopHandoffSvgPath: string;
     photoshopWorkingPsdPath: string;
     photoshopFeedbackPath: string;
-  }
+  },
+  visibleMouseProof: boolean
 ): AdobeProjectWorkflowStep[] {
-  return [
+  const steps: Array<Omit<AdobeProjectWorkflowStep, "step">> = [
     {
-      step: 1,
       app: "Illustrator",
       action: "Run the Illustrator scene JSX to create the editable vector document.",
       jobId: sceneJob.id,
       scriptPath: sceneJob.illustratorJobPath,
       resultPath: sceneJob.resultPath,
       expected: "Scene job result JSON exists with ok=true and kind=cartoon_scene."
-    },
+    }
+  ];
+
+  if (visibleMouseProof) {
+    steps.push({
+      app: "Bridge",
+      action: "Drive the visible Windows mouse in Illustrator to draw on the active vector document before exporting the source SVG.",
+      expected: "Illustrator mouse proof returns ok=true after measuring/focusing the Illustrator window and moving the real pointer."
+    });
+  }
+
+  steps.push(
     {
-      step: 2,
       app: "Illustrator",
       action: `Export the current Illustrator document as source SVG at ${paths.sourceSvgPath}.`,
       jobId: sourceExportJob.id,
@@ -681,37 +955,69 @@ function buildRunbook(
       expected: "Source SVG export result JSON exists with ok=true and kind=export."
     },
     {
-      step: 3,
       app: "Bridge",
       action: "Run source SVG QA before handing the artwork to Photoshop.",
       expected: "Source SVG exists and is non-empty."
     },
     {
-      step: 4,
       app: "Photoshop",
-      action: `Open the source SVG, create a layered project pass at ${paths.photoshopWorkingPsdPath}, write PNG preview ${paths.photoshopReferencePngPath}, write SVG handoff ${paths.photoshopHandoffSvgPath}, and write feedback JSON ${paths.photoshopFeedbackPath}.`,
+      action: visibleMouseProof
+        ? `Open the source SVG, create a layered project pass at ${paths.photoshopWorkingPsdPath}, write preliminary PNG/SVG/feedback artifacts, and keep the Photoshop document active for visible mouse editing.`
+        : `Open the source SVG, create a layered project pass at ${paths.photoshopWorkingPsdPath}, write PNG preview ${paths.photoshopReferencePngPath}, write SVG handoff ${paths.photoshopHandoffSvgPath}, and write feedback JSON ${paths.photoshopFeedbackPath}.`,
       jobId: photoshopProjectJob.id,
       scriptPath: photoshopProjectJob.photoshopJobPath,
       resultPath: photoshopProjectJob.resultPath,
       expected: "Photoshop project-pass result JSON exists with ok=true and kind=project_pass."
-    },
-    {
-      step: 5,
+    }
+  );
+
+  if (visibleMouseProof) {
+    steps.push({
       app: "Bridge",
-      action: "Run PNG QA on the Photoshop preview, verify the Photoshop SVG handoff, and read Photoshop feedback JSON.",
+      action: "Drive the visible Windows mouse in Photoshop while the source SVG document is active.",
+      expected: "Photoshop mouse proof returns ok=true after measuring/focusing the Photoshop window and moving the real pointer."
+    });
+
+    if (photoshopCommitJob) {
+      steps.push({
+        app: "Photoshop",
+        action: `Commit the active post-mouse Photoshop document to ${paths.photoshopWorkingPsdPath}, ${paths.photoshopReferencePngPath}, ${paths.photoshopHandoffSvgPath}, and ${paths.photoshopFeedbackPath}.`,
+        jobId: photoshopCommitJob.id,
+        scriptPath: photoshopCommitJob.photoshopJobPath,
+        resultPath: photoshopCommitJob.resultPath,
+        expected: "Photoshop post-mouse commit result JSON exists with ok=true and kind=project_commit."
+      });
+    }
+  }
+
+  steps.push(
+    {
+      app: "Bridge",
+      action: visibleMouseProof
+        ? "Run PNG QA on the post-mouse Photoshop preview, verify the post-mouse Photoshop SVG handoff, and read Photoshop feedback JSON."
+        : "Run PNG QA on the Photoshop preview, verify the Photoshop SVG handoff, and read Photoshop feedback JSON.",
       expected: "Photoshop PNG exists, SVG handoff exists, and feedback JSON is available for the next Illustrator pass."
     },
     {
-      step: 6,
       app: "Illustrator",
       action: "Place the Photoshop SVG handoff back into the active Illustrator document as a named reference layer.",
       jobId: illustratorReferenceJob.id,
       scriptPath: illustratorReferenceJob.illustratorJobPath,
       resultPath: illustratorReferenceJob.resultPath,
       expected: "Illustrator placement result JSON exists with ok=true and kind=place_file_reference."
-    },
+    }
+  );
+
+  if (visibleMouseProof) {
+    steps.push({
+      app: "Bridge",
+      action: "Drive the visible Windows mouse in Illustrator after placing the Photoshop SVG handoff and before final SVG export.",
+      expected: "Illustrator return-pass mouse proof returns ok=true after moving the real pointer over the active Illustrator document."
+    });
+  }
+
+  steps.push(
     {
-      step: 7,
       app: "Illustrator",
       action: `Export the final collaborative project SVG at ${paths.outputPath}.`,
       jobId: finalExportJob.id,
@@ -720,12 +1026,13 @@ function buildRunbook(
       expected: "Final export result JSON exists with ok=true and kind=export."
     },
     {
-      step: 8,
       app: "Bridge",
       action: "Run final SVG QA plus artwork review; feed review.nextGoalPrompt into the next full Illustrator-Photoshop-Illustrator round-trip if needed.",
       expected: "The final output has both editable Illustrator vector content and a Photoshop-generated project reference pass."
     }
-  ];
+  );
+
+  return steps.map((step, index) => ({ step: index + 1, ...step }));
 }
 
 function nextSteps(
@@ -736,6 +1043,7 @@ function nextSteps(
     sceneLaunch: LaunchJobResult;
     sourceExportLaunch: LaunchJobResult;
     photoshopProjectLaunch: LaunchJobResult;
+    photoshopCommitLaunch?: LaunchJobResult;
     illustratorReferenceLaunch: LaunchJobResult;
     finalExportLaunch: LaunchJobResult;
     artworkReview?: ArtworkReviewReport;
@@ -747,6 +1055,7 @@ function nextSteps(
       launches.sceneLaunch.next.waitForResult,
       launches.sourceExportLaunch.next.waitForResult,
       launches.photoshopProjectLaunch.next.waitForResult,
+      ...(launches.photoshopCommitLaunch ? [launches.photoshopCommitLaunch.next.waitForResult] : []),
       launches.illustratorReferenceLaunch.next.waitForResult,
       launches.finalExportLaunch.next.waitForResult
     ];
@@ -757,6 +1066,7 @@ function nextSteps(
       launches.sceneLaunch.next.waitForResult,
       launches.sourceExportLaunch.next.waitForResult,
       launches.photoshopProjectLaunch.next.waitForResult,
+      ...(launches.photoshopCommitLaunch ? [launches.photoshopCommitLaunch.next.waitForResult] : []),
       launches.illustratorReferenceLaunch.next.waitForResult,
       launches.finalExportLaunch.next.waitForResult
     ];
@@ -788,6 +1098,7 @@ function reviewIteration(
     photoshopHandoffQaOk: execution.photoshopHandoffQa?.ok,
     finalExportQaOk: execution.finalExportQa?.ok,
     artworkReviewOk: execution.artworkReview?.ok,
+    visibleMouseOk: execution.visibleMouseProofs ? visibleMouseProofsOk(execution.visibleMouseProofs, true) : undefined,
     nextGoalPrompt
   };
 }
