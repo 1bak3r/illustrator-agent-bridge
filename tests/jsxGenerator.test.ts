@@ -89,3 +89,28 @@ test("generates an Illustrator export JSX job", () => {
   assert.match(jsx, /doc\.saveAs\(outputFile, pdfOptions\)/);
   assert.match(jsx, /figure\.pdf/);
 });
+
+test("generates an Illustrator Photoshop reference placement JSX job", () => {
+  const jsx = generateJsx(
+    {
+      kind: "place_file_reference",
+      inputPath: "C:/Users/example/out/photoshop-handoff.svg",
+      layerName: "Photoshop SVG handoff",
+      name: "working proof",
+      x: 12,
+      y: 18,
+      width: 720,
+      height: 480,
+      opacity: 42,
+      locked: true
+    },
+    { id: "job-place", resultPath: "C:/Users/example/out/result.json" }
+  );
+
+  assert.match(jsx, /#target illustrator/);
+  assert.match(jsx, /placedItems\.add/);
+  assert.match(jsx, /photoshop-handoff\.svg/);
+  assert.match(jsx, /layer\.name = "Photoshop SVG handoff"/);
+  assert.match(jsx, /placed\.opacity = 42/);
+  assert.match(jsx, /"kind":"place_file_reference"/);
+});

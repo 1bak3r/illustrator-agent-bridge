@@ -251,6 +251,31 @@ test("agent MCP server exposes and calls bridge job tools", async () => {
     assert.equal(adobeProofBody.sceneLaunch.command.command, "powershell.exe");
     assert.equal(adobeProofBody.photoshopLaunch.command.command, "powershell.exe");
 
+    const adobeProjectResult = await client.callTool({
+      name: "execute_adobe_project_workflow",
+      arguments: {
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/mcp-adobe-project.svg",
+        intent: "cartoon",
+        root,
+        platform: "wsl",
+        photoshopPlatform: "wsl",
+        illustratorRunMode: "com",
+        dryRun: true,
+        maxReviewIterations: 3
+      }
+    });
+    const adobeProjectContent = adobeProjectResult.content as Array<{ type: string; text?: string }>;
+    const adobeProjectBody = JSON.parse(adobeProjectContent[0]?.text ?? "");
+    assert.equal(adobeProjectBody.ok, true);
+    assert.equal(adobeProjectBody.dryRun, true);
+    assert.equal(adobeProjectBody.workflow.runbook.length, 8);
+    assert.equal(adobeProjectBody.workflow.handoff.sequence.length, 5);
+    assert.match(adobeProjectBody.workflow.photoshopHandoffSvgPath, /mcp-adobe-project\.photoshop-handoff\.svg$/);
+    assert.equal(adobeProjectBody.workflow.handoff.illustratorConsumes, adobeProjectBody.workflow.photoshopHandoffSvgPath);
+    assert.equal(adobeProjectBody.photoshopProjectLaunch.command.command, "powershell.exe");
+    assert.equal(adobeProjectBody.illustratorReferenceLaunch.command.command, "powershell.exe");
+
     const objectWorkflowResult = await client.callTool({
       name: "prepare_object_shape_workflow",
       arguments: {

@@ -19,6 +19,7 @@ import { inspectExportArtifact } from "../qa/exportQa.js";
 import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
 import { inspectVectorShapeFiles } from "../semantic/vectorShapeIngest.js";
+import { executeAdobeProjectWorkflow } from "../workflow/adobeProjectWorkflow.js";
 import { executeAdobeSvgProofWorkflow } from "../workflow/adobeSvgProofWorkflow.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
 import { executeObjectShapeWorkflow } from "../workflow/objectExecutor.js";
@@ -527,6 +528,134 @@ export function createAgentMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "execute_adobe_project_workflow",
+    {
+      title: "Execute Illustrator And Photoshop Project Workflow",
+      description:
+        "Run a full Illustrator -> Photoshop -> Illustrator project handoff: editable Illustrator vector scene, source SVG export, Photoshop layered PSD/PNG/SVG handoff pass, Illustrator SVG handoff placement, final SVG export, and QA/review.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1500),
+        outputPath: z.string().min(1).max(1000),
+        sourceSvgPath: z.string().min(1).max(1000).optional(),
+        photoshopReferencePngPath: z.string().min(1).max(1000).optional(),
+        photoshopHandoffSvgPath: z.string().min(1).max(1000).optional(),
+        photoshopWorkingPsdPath: z.string().min(1).max(1000).optional(),
+        photoshopFeedbackPath: z.string().min(1).max(1000).optional(),
+        intent: adobeArtworkIntentSchema,
+        width: z.number().int().min(360).max(14400).optional(),
+        height: z.number().int().min(240).max(14400).optional(),
+        title: z.string().min(1).max(120).optional(),
+        planner: plannerModeSchema,
+        model: z.string().min(1).max(120).optional(),
+        proofWidth: z.number().int().min(1).max(30000).optional(),
+        proofHeight: z.number().int().min(1).max(30000).optional(),
+        proofResolution: z.number().min(1).max(2400).optional(),
+        referenceOpacity: z.number().min(0).max(100).optional(),
+        embedReference: z.boolean().optional(),
+        illustratorRunMode: adobeSvgProofRunModeSchema,
+        platform: launchPlatformSchema,
+        photoshopPlatform: launchPlatformSchema,
+        appPath: z.string().min(1).max(1000).optional(),
+        dryRun: z.boolean().optional(),
+        waitForResults: z.boolean().optional(),
+        timeoutMs: z.number().int().min(0).max(600_000).optional(),
+        intervalMs: z.number().int().min(100).max(60_000).optional(),
+        skipQa: z.boolean().optional(),
+        skipArtworkReview: z.boolean().optional(),
+        minBytes: z.number().int().min(0).optional(),
+        minWidth: z.number().int().min(1).optional(),
+        minHeight: z.number().int().min(1).optional(),
+        minNonBlankRatio: z.number().min(0).max(1).optional(),
+        proofMinWidth: z.number().int().min(1).optional(),
+        proofMinHeight: z.number().int().min(1).optional(),
+        proofMinNonBlankRatio: z.number().min(0).max(1).optional(),
+        maxReviewIterations: z.number().int().min(1).max(10).optional(),
+        root: optionalRootSchema
+      }
+    },
+    async ({
+      prompt,
+      outputPath,
+      sourceSvgPath,
+      photoshopReferencePngPath,
+      photoshopHandoffSvgPath,
+      photoshopWorkingPsdPath,
+      photoshopFeedbackPath,
+      intent,
+      width,
+      height,
+      title,
+      planner,
+      model,
+      proofWidth,
+      proofHeight,
+      proofResolution,
+      referenceOpacity,
+      embedReference,
+      illustratorRunMode,
+      platform: launchPlatform,
+      photoshopPlatform,
+      appPath,
+      dryRun,
+      waitForResults,
+      timeoutMs,
+      intervalMs,
+      skipQa,
+      skipArtworkReview,
+      minBytes,
+      minWidth,
+      minHeight,
+      minNonBlankRatio,
+      proofMinWidth,
+      proofMinHeight,
+      proofMinNonBlankRatio,
+      maxReviewIterations,
+      root
+    }) => {
+      const execution = await executeAdobeProjectWorkflow({
+        prompt,
+        outputPath,
+        sourceSvgPath,
+        photoshopReferencePngPath,
+        photoshopHandoffSvgPath,
+        photoshopWorkingPsdPath,
+        photoshopFeedbackPath,
+        intent,
+        width,
+        height,
+        title,
+        plannerMode: planner,
+        openAiModel: model,
+        proofWidth,
+        proofHeight,
+        proofResolution,
+        referenceOpacity,
+        embedReference,
+        illustratorRunMode,
+        launchPlatform,
+        photoshopPlatform,
+        appPath,
+        dryRun,
+        waitForResults,
+        timeoutMs,
+        intervalMs,
+        skipQa,
+        skipArtworkReview,
+        minBytes,
+        minWidth,
+        minHeight,
+        minNonBlankRatio,
+        proofMinWidth,
+        proofMinHeight,
+        proofMinNonBlankRatio,
+        maxReviewIterations,
+        root
+      });
+      return jsonToolResult(execution);
+    }
+  );
+
+  server.registerTool(
     "prepare_object_shape_workflow",
     {
       title: "Prepare Guarded Object Shape Workflow",
@@ -971,6 +1100,7 @@ export function createAgentMcpServer(): McpServer {
                 "prepare_cartoon_publication_workflow",
                 "execute_cartoon_publication_workflow",
                 "execute_adobe_svg_proof_workflow",
+                "execute_adobe_project_workflow",
                 "prepare_object_shape_workflow",
                 "execute_object_shape_workflow",
                 "plan_cartoon_scene_job",
@@ -995,6 +1125,8 @@ export function createAgentMcpServer(): McpServer {
                 result: "Each generated JSX job writes a JSON result file.",
                 export: "Export jobs require an active Illustrator document.",
                 photoshopProof: "execute_adobe_svg_proof_workflow keeps Illustrator SVG as the editable source and uses Photoshop COM to rasterize a PNG proof for QA/review.",
+                photoshopProject:
+                  "execute_adobe_project_workflow runs an Illustrator -> Photoshop -> Illustrator handoff: source SVG, Photoshop layered PSD/PNG/feedback plus return SVG handoff, Illustrator SVG placement, final SVG.",
                 qa: "Run qa_export_artifact for file checks, then review_artwork_quality to get a refinement prompt before accepting the artwork."
               }
             },

@@ -19,6 +19,7 @@ import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
 import type { SemanticKind } from "../semantic/types.js";
 import { inspectVectorShapeFiles } from "../semantic/vectorShapeIngest.js";
+import { executeAdobeProjectWorkflow, prepareAdobeProjectWorkflow } from "../workflow/adobeProjectWorkflow.js";
 import { executeAdobeSvgProofWorkflow, prepareAdobeSvgProofWorkflow, type AdobeArtworkIntent, type AdobeSvgProofRunMode } from "../workflow/adobeSvgProofWorkflow.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
 import { executeObjectShapeWorkflow, type ObjectWorkflowRunMode } from "../workflow/objectExecutor.js";
@@ -357,6 +358,78 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
       proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
       proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      launchPlatform: optionalLaunchPlatform(body.platform),
+      appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      illustratorRunMode: optionalAdobeSvgProofRunMode(body.illustratorRunMode),
+      photoshopPlatform: optionalLaunchPlatform(body.photoshopPlatform),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      waitForResults: optionalBooleanBodyValue(body.waitForResults, "waitForResults"),
+      timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
+      intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
+      skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      skipArtworkReview: optionalBooleanBodyValue(body.skipArtworkReview, "skipArtworkReview"),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio"),
+      proofMinWidth: optionalNumberBodyValue(body.proofMinWidth, "proofMinWidth"),
+      proofMinHeight: optionalNumberBodyValue(body.proofMinHeight, "proofMinHeight"),
+      proofMinNonBlankRatio: optionalNumberBodyValue(body.proofMinNonBlankRatio, "proofMinNonBlankRatio"),
+      maxReviewIterations: optionalNumberBodyValue(body.maxReviewIterations, "maxReviewIterations"),
+      root
+    });
+    writeJson(response, 201, execution);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/adobe-project") {
+    const body = objectBody(await readJson(request));
+    const workflow = await prepareAdobeProjectWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      sourceSvgPath: optionalStringBodyValue(body.sourceSvgPath, "sourceSvgPath"),
+      photoshopReferencePngPath: optionalStringBodyValue(body.photoshopReferencePngPath, "photoshopReferencePngPath"),
+      photoshopHandoffSvgPath: optionalStringBodyValue(body.photoshopHandoffSvgPath, "photoshopHandoffSvgPath"),
+      photoshopWorkingPsdPath: optionalStringBodyValue(body.photoshopWorkingPsdPath, "photoshopWorkingPsdPath"),
+      photoshopFeedbackPath: optionalStringBodyValue(body.photoshopFeedbackPath, "photoshopFeedbackPath"),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      intent: optionalAdobeArtworkIntent(body.intent),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
+      proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
+      proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
+      proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      referenceOpacity: optionalNumberBodyValue(body.referenceOpacity, "referenceOpacity"),
+      embedReference: optionalBooleanBodyValue(body.embedReference, "embedReference"),
+      root
+    });
+    writeJson(response, 201, workflow);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/adobe-project/execute") {
+    const body = objectBody(await readJson(request));
+    const execution = await executeAdobeProjectWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      sourceSvgPath: optionalStringBodyValue(body.sourceSvgPath, "sourceSvgPath"),
+      photoshopReferencePngPath: optionalStringBodyValue(body.photoshopReferencePngPath, "photoshopReferencePngPath"),
+      photoshopHandoffSvgPath: optionalStringBodyValue(body.photoshopHandoffSvgPath, "photoshopHandoffSvgPath"),
+      photoshopWorkingPsdPath: optionalStringBodyValue(body.photoshopWorkingPsdPath, "photoshopWorkingPsdPath"),
+      photoshopFeedbackPath: optionalStringBodyValue(body.photoshopFeedbackPath, "photoshopFeedbackPath"),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      intent: optionalAdobeArtworkIntent(body.intent),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
+      proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
+      proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
+      proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      referenceOpacity: optionalNumberBodyValue(body.referenceOpacity, "referenceOpacity"),
+      embedReference: optionalBooleanBodyValue(body.embedReference, "embedReference"),
       launchPlatform: optionalLaunchPlatform(body.platform),
       appPath: optionalStringBodyValue(body.appPath, "appPath"),
       illustratorRunMode: optionalAdobeSvgProofRunMode(body.illustratorRunMode),

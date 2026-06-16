@@ -57,3 +57,32 @@ test("creates a Photoshop proof job and can dry-run Photoshop COM execution", as
   assert.equal(launch.command.command, "powershell.exe");
   assert.match(launch.next.resultContract, /Photoshop/);
 });
+
+test("generates a Photoshop project pass with PSD, PNG, SVG, and feedback artifacts", () => {
+  const jsx = generatePhotoshopJsx(
+    {
+      kind: "project_pass",
+      inputPath: "C:/Users/example/out/source.svg",
+      outputPngPath: "C:/Users/example/out/project-reference.png",
+      outputSvgPath: "C:/Users/example/out/project-handoff.svg",
+      outputPsdPath: "C:/Users/example/out/project-working.psd",
+      feedbackPath: "C:/Users/example/out/project-feedback.json",
+      prompt: "scientific concept figure",
+      passName: "texture and contrast pass",
+      width: 1200,
+      height: 800
+    },
+    { id: "photoshop-project-pass-1", resultPath: "C:/Users/example/out/result.json" }
+  );
+
+  assert.match(jsx, /#target photoshop/);
+  assert.match(jsx, /PhotoshopSaveOptions/);
+  assert.match(jsx, /PNGSaveOptions/);
+  assert.match(jsx, /project-reference\.png/);
+  assert.match(jsx, /project-handoff\.svg/);
+  assert.match(jsx, /project-working\.psd/);
+  assert.match(jsx, /project-feedback\.json/);
+  assert.match(jsx, /"kind":"project_pass"/);
+  assert.match(jsx, /writeText\(outputSvgFile\.fsName, svgText\)/);
+  assert.match(jsx, /photoshop_project_pass/);
+});

@@ -28,6 +28,7 @@ import {
   type AdobeArtworkIntent,
   type AdobeSvgProofRunMode
 } from "./workflow/adobeSvgProofWorkflow.js";
+import { executeAdobeProjectWorkflow, prepareAdobeProjectWorkflow } from "./workflow/adobeProjectWorkflow.js";
 import { executeCartoonWorkflow } from "./workflow/cartoonExecutor.js";
 import { executeObjectShapeWorkflow, type ObjectWorkflowRunMode } from "./workflow/objectExecutor.js";
 import { prepareCartoonWorkflow } from "./workflow/cartoonWorkflow.js";
@@ -93,6 +94,12 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "workflow:execute-adobe-svg-proof":
       await workflowExecuteAdobeSvgProof(rest);
+      return;
+    case "workflow:adobe-project":
+      await workflowAdobeProject(rest);
+      return;
+    case "workflow:execute-adobe-project":
+      await workflowExecuteAdobeProject(rest);
       return;
     case "workflow:object":
       await workflowObject(rest);
@@ -776,6 +783,103 @@ async function workflowExecuteAdobeSvgProof(args: string[]): Promise<void> {
   console.log(JSON.stringify(execution, null, 2));
 }
 
+async function workflowAdobeProject(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const prompt = options.positionals.join(" ");
+  const outputPath = optionValue(options, "output");
+
+  if (!prompt) {
+    throw new ValidationError("workflow:adobe-project requires a prompt");
+  }
+
+  if (!outputPath) {
+    throw new ValidationError("workflow:adobe-project requires --output PATH");
+  }
+
+  const workflow = await prepareAdobeProjectWorkflow({
+    prompt,
+    outputPath,
+    sourceSvgPath: optionValue(options, "source-svg"),
+    photoshopReferencePngPath: optionValue(options, "photoshop-reference"),
+    photoshopHandoffSvgPath: optionValue(options, "photoshop-handoff-svg"),
+    photoshopWorkingPsdPath: optionValue(options, "photoshop-working-psd"),
+    photoshopFeedbackPath: optionValue(options, "photoshop-feedback"),
+    root: optionValue(options, "root"),
+    corpusPath: optionValue(options, "corpus"),
+    title: optionValue(options, "title"),
+    width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined,
+    intent: optionalAdobeArtworkIntent(optionValue(options, "intent")),
+    plannerMode: optionalPlannerMode(optionValue(options, "planner")),
+    openAiModel: optionValue(options, "model"),
+    proofWidth: optionValue(options, "proof-width") ? Number(optionValue(options, "proof-width")) : undefined,
+    proofHeight: optionValue(options, "proof-height") ? Number(optionValue(options, "proof-height")) : undefined,
+    proofResolution: optionValue(options, "proof-resolution") ? Number(optionValue(options, "proof-resolution")) : undefined,
+    referenceOpacity: optionValue(options, "reference-opacity") ? Number(optionValue(options, "reference-opacity")) : undefined,
+    embedReference: flagValue(options, "embed-reference")
+  });
+
+  console.log(JSON.stringify(workflow, null, 2));
+}
+
+async function workflowExecuteAdobeProject(args: string[]): Promise<void> {
+  const options = parseOptions(args);
+  const prompt = options.positionals.join(" ");
+  const outputPath = optionValue(options, "output");
+  const dryRun = flagValue(options, "dry-run");
+
+  if (!prompt) {
+    throw new ValidationError("workflow:execute-adobe-project requires a prompt");
+  }
+
+  if (!outputPath) {
+    throw new ValidationError("workflow:execute-adobe-project requires --output PATH");
+  }
+
+  const execution = await executeAdobeProjectWorkflow({
+    prompt,
+    outputPath,
+    sourceSvgPath: optionValue(options, "source-svg"),
+    photoshopReferencePngPath: optionValue(options, "photoshop-reference"),
+    photoshopHandoffSvgPath: optionValue(options, "photoshop-handoff-svg"),
+    photoshopWorkingPsdPath: optionValue(options, "photoshop-working-psd"),
+    photoshopFeedbackPath: optionValue(options, "photoshop-feedback"),
+    root: optionValue(options, "root"),
+    corpusPath: optionValue(options, "corpus"),
+    title: optionValue(options, "title"),
+    width: optionValue(options, "width") ? Number(optionValue(options, "width")) : undefined,
+    height: optionValue(options, "height") ? Number(optionValue(options, "height")) : undefined,
+    intent: optionalAdobeArtworkIntent(optionValue(options, "intent")),
+    plannerMode: optionalPlannerMode(optionValue(options, "planner")),
+    openAiModel: optionValue(options, "model"),
+    proofWidth: optionValue(options, "proof-width") ? Number(optionValue(options, "proof-width")) : undefined,
+    proofHeight: optionValue(options, "proof-height") ? Number(optionValue(options, "proof-height")) : undefined,
+    proofResolution: optionValue(options, "proof-resolution") ? Number(optionValue(options, "proof-resolution")) : undefined,
+    referenceOpacity: optionValue(options, "reference-opacity") ? Number(optionValue(options, "reference-opacity")) : undefined,
+    embedReference: flagValue(options, "embed-reference"),
+    launchPlatform: optionalLaunchPlatform(optionValue(options, "platform")),
+    appPath: optionValue(options, "app"),
+    illustratorRunMode: optionalAdobeSvgProofRunMode(optionValue(options, "illustrator-run-mode")),
+    photoshopPlatform: optionalLaunchPlatform(optionValue(options, "photoshop-platform")),
+    dryRun,
+    waitForResults: dryRun ? false : !flagValue(options, "no-wait"),
+    timeoutMs: optionValue(options, "timeout-ms") ? Number(optionValue(options, "timeout-ms")) : undefined,
+    intervalMs: optionValue(options, "interval-ms") ? Number(optionValue(options, "interval-ms")) : undefined,
+    skipQa: flagValue(options, "skip-qa"),
+    skipArtworkReview: flagValue(options, "skip-review"),
+    minBytes: optionValue(options, "min-bytes") ? Number(optionValue(options, "min-bytes")) : undefined,
+    minWidth: optionValue(options, "min-width") ? Number(optionValue(options, "min-width")) : undefined,
+    minHeight: optionValue(options, "min-height") ? Number(optionValue(options, "min-height")) : undefined,
+    minNonBlankRatio: optionValue(options, "min-nonblank-ratio") ? Number(optionValue(options, "min-nonblank-ratio")) : undefined,
+    proofMinWidth: optionValue(options, "proof-min-width") ? Number(optionValue(options, "proof-min-width")) : undefined,
+    proofMinHeight: optionValue(options, "proof-min-height") ? Number(optionValue(options, "proof-min-height")) : undefined,
+    proofMinNonBlankRatio: optionValue(options, "proof-min-nonblank-ratio") ? Number(optionValue(options, "proof-min-nonblank-ratio")) : undefined,
+    maxReviewIterations: optionValue(options, "max-review-iterations") ? Number(optionValue(options, "max-review-iterations")) : undefined
+  });
+
+  console.log(JSON.stringify(execution, null, 2));
+}
+
 async function workflowObject(args: string[]): Promise<void> {
   const options = parseOptions(args);
   const prompt = options.positionals.join(" ");
@@ -854,7 +958,18 @@ interface ParsedOptions {
   flags: Set<string>;
 }
 
-const flagOptions = new Set(["dry-run", "no-wait", "skip-qa", "skip-review", "wait", "auto-confirm-dialog", "draw-circle", "draw-complex", "mouse-proof"]);
+const flagOptions = new Set([
+  "dry-run",
+  "no-wait",
+  "skip-qa",
+  "skip-review",
+  "wait",
+  "auto-confirm-dialog",
+  "draw-circle",
+  "draw-complex",
+  "mouse-proof",
+  "embed-reference"
+]);
 
 function parseOptions(args: string[]): ParsedOptions {
   const positionals: string[] = [];
@@ -974,6 +1089,8 @@ Commands:
   workflow:execute-cartoon PROMPT --output PATH [--format pdf|svg|png|jpg] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--planner deterministic|auto|openai] [--model MODEL] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   workflow:adobe-svg-proof PROMPT --output SVG_PATH [--proof-output PNG_PATH] [--intent auto|cartoon|scientific|object] [--planner deterministic|auto|openai] [--proof-width N] [--proof-height N] [--proof-resolution N] [--root DIR] [--corpus PATH]
   workflow:execute-adobe-svg-proof PROMPT --output SVG_PATH [--proof-output PNG_PATH] [--intent auto|cartoon|scientific|object] [--illustrator-run-mode launch|com] [--max-review-iterations N] [--platform auto|macos|windows|wsl|linux] [--photoshop-platform auto|windows|wsl] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--root DIR] [--corpus PATH]
+  workflow:adobe-project PROMPT --output SVG_PATH [--source-svg SVG_PATH] [--photoshop-reference PNG_PATH] [--photoshop-handoff-svg SVG_PATH] [--photoshop-working-psd PSD_PATH] [--photoshop-feedback JSON_PATH] [--intent auto|cartoon|scientific|object] [--reference-opacity N] [--embed-reference] [--root DIR] [--corpus PATH]
+  workflow:execute-adobe-project PROMPT --output SVG_PATH [--source-svg SVG_PATH] [--photoshop-reference PNG_PATH] [--photoshop-handoff-svg SVG_PATH] [--photoshop-working-psd PSD_PATH] [--photoshop-feedback JSON_PATH] [--intent auto|cartoon|scientific|object] [--illustrator-run-mode launch|com] [--max-review-iterations N] [--reference-opacity N] [--embed-reference] [--platform auto|macos|windows|wsl|linux] [--photoshop-platform auto|windows|wsl] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--root DIR] [--corpus PATH]
   workflow:object PROMPT --output PATH [--format pdf|svg|png|jpg] [--max-guard-iterations N] [--root DIR] [--corpus PATH]
   workflow:execute-object PROMPT --output PATH [--format pdf|svg|png|jpg] [--run-mode launch|com] [--max-guard-iterations N] [--dry-run] [--no-wait] [--skip-qa] [--skip-review] [--platform auto|macos|windows|wsl|linux] [--app PATH_OR_NAME] [--root DIR] [--corpus PATH] [--min-nonblank-ratio N]
   job:status JOB_ID [--root DIR]

@@ -44,6 +44,22 @@ export function normalizeCommand(input: unknown): BridgeCommand {
     };
   }
 
+  if (kind === "place_image_reference" || kind === "place_file_reference") {
+    return {
+      kind,
+      inputPath: stringValue(value.inputPath, "inputPath", 1000),
+      layerName: optionalString(value.layerName, "layerName", 120),
+      name: optionalString(value.name, "name", 120),
+      x: optionalFiniteNumber(value.x, "x"),
+      y: optionalFiniteNumber(value.y, "y"),
+      width: optionalPositiveNumber(value.width, "width", 14400),
+      height: optionalPositiveNumber(value.height, "height", 14400),
+      opacity: optionalNumberRange(value.opacity, "opacity", 0, 100),
+      locked: value.locked === undefined ? undefined : booleanValue(value.locked, "locked"),
+      embed: value.embed === undefined ? undefined : booleanValue(value.embed, "embed")
+    };
+  }
+
   throw new ValidationError(`Unsupported command kind: ${kind}`);
 }
 

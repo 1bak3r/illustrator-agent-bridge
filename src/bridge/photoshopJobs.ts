@@ -31,15 +31,26 @@ export async function createGeneratedPhotoshopJob(
 }
 
 function toHostCommand(command: PhotoshopCommand, hostPlatform?: AdobeHostPlatform): PhotoshopCommand {
-  if (command.kind !== "svg_proof") {
-    return command;
+  if (command.kind === "project_pass") {
+    return {
+      ...command,
+      inputPath: toAdobeHostPath(resolvePath(command.inputPath), hostPlatform),
+      outputPngPath: toAdobeHostPath(resolvePath(command.outputPngPath), hostPlatform),
+      outputSvgPath: toAdobeHostPath(resolvePath(command.outputSvgPath), hostPlatform),
+      outputPsdPath: toAdobeHostPath(resolvePath(command.outputPsdPath), hostPlatform),
+      feedbackPath: toAdobeHostPath(resolvePath(command.feedbackPath), hostPlatform)
+    };
   }
 
-  return {
-    ...command,
-    inputPath: toAdobeHostPath(resolvePath(command.inputPath), hostPlatform),
-    outputPath: toAdobeHostPath(resolvePath(command.outputPath), hostPlatform)
-  };
+  if (command.kind === "svg_proof") {
+    return {
+      ...command,
+      inputPath: toAdobeHostPath(resolvePath(command.inputPath), hostPlatform),
+      outputPath: toAdobeHostPath(resolvePath(command.outputPath), hostPlatform)
+    };
+  }
+
+  return command;
 }
 
 function resolvePath(path: string): string {

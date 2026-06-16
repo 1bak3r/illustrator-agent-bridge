@@ -20,6 +20,7 @@ The bridge has proven no-key Illustrator control on Windows Illustrator from WSL
 - Uses shape recipes for concrete objects such as cats, locks, and keys, then runs a local guard that returns a refinement prompt when recognizable parts, spatial grammar, or visual footprint checks fail.
 - Runs post-export artwork review that combines export QA, vector/pixel checks, scene composition checks, label-reliance checks, and `nextGoalPrompt` output for the next refinement pass.
 - Runs a cross-Adobe SVG proof workflow: natural-language prompt -> semantic/object/scientific plan -> editable Illustrator SVG -> Photoshop COM raster proof PNG -> export QA/artwork review for feedback before accepting the SVG.
+- Runs a collaborative Adobe project workflow: Illustrator creates the editable vector source SVG, Photoshop opens that SVG and writes a layered PSD, PNG preview, feedback JSON, and SVG handoff, Illustrator places that Photoshop SVG handoff back into the active document as a named reference layer, and Illustrator exports the final project SVG.
 - Can inspect reviewed SVG, AI, EPS, PDF, or saved bridge scene JSON files and convert detected vector shape combinations into searchable `shape_combination` semantic evidence.
 - Reads Illustrator's result JSON back from `var/results/`.
 - Exposes the same probe through CLI, HTTP dashboard, and MCP tools for an agent/browser workflow.
@@ -54,6 +55,7 @@ npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner auto
 npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
 npm run workflow:execute-cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.svg --format svg --dry-run
 npm run workflow:execute-adobe-svg-proof -- "polymer membrane electron transfer catalytic concept" --output ./var/exports/concept.svg --intent auto --illustrator-run-mode com --platform wsl --photoshop-platform wsl --dry-run
+npm run workflow:execute-adobe-project -- "polymer membrane electron transfer catalytic concept" --output ./var/exports/concept-project.svg --intent auto --illustrator-run-mode com --platform wsl --photoshop-platform wsl --dry-run
 npm run workflow:execute-object -- "full cat icon" --output ./var/exports/cat.png --format png --run-mode com --platform wsl --dry-run
 node dist/src/cli.js qa:artwork ./var/exports/cat.png --format png --prompt "full cat icon" --target cat
 ```
@@ -191,6 +193,20 @@ npm run photoshop:proof-svg -- ./var/exports/figure.svg --output ./var/exports/f
 node dist/src/cli.js job:run-photoshop-com <job-id> --platform wsl --dry-run
 ```
 
+Run a full Illustrator/Photoshop collaborative project pass:
+
+```bash
+npm run workflow:execute-adobe-project -- "core shell emulsion polymerization scientific concept" \
+  --output ./var/exports/core-shell-project.svg \
+  --intent auto \
+  --illustrator-run-mode com \
+  --platform wsl \
+  --photoshop-platform wsl \
+  --max-review-iterations 3
+```
+
+`workflow:execute-adobe-project` is the heavier back-and-forth path. It runs Illustrator first to build the editable vector scene and export a source `.illustrator-source.svg`, then runs Photoshop through COM to open that SVG and save a layered `.photoshop-working.psd`, a `.photoshop-reference.png` preview, a `.photoshop-handoff.svg`, and a `.photoshop-feedback.json` file. The workflow then returns to Illustrator, places the Photoshop SVG handoff as a named reference layer in the still-open vector document, exports the final SVG, and runs QA/review. If review returns `nextGoalPrompt` and `--max-review-iterations` is greater than 1, the next pass repeats the full Illustrator -> Photoshop -> Illustrator loop instead of only rechecking the same export.
+
 Inspect reviewed vector assets and turn their shape combinations into searchable evidence:
 
 ```bash
@@ -267,6 +283,7 @@ Use `bridge_run_job_via_com` to execute any generated JSX job through Windows Il
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
 Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.
 Use `execute_adobe_svg_proof_workflow` when a browser/ChatGPT agent should take a prompt, create editable Illustrator SVG artwork, ask Photoshop to rasterize that SVG into a PNG proof, and return QA/review feedback for the next Illustrator refinement pass.
+Use `execute_adobe_project_workflow` when the agent should run a true shared project handoff where Illustrator sends source SVG to Photoshop, Photoshop creates PSD/PNG/feedback plus a return SVG handoff, and Illustrator consumes that Photoshop SVG before final SVG export.
 Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
 Use `qa_export_artifact` after export to check file size, format signature, dimensions, SVG/PDF structure, and PNG nonblank pixel content.
 Use `review_artwork_quality` after export when an agent needs a semantic visual critique and `review.nextGoalPrompt` for the next revision pass.

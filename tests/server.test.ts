@@ -438,6 +438,57 @@ test("HTTP bridge executes an Adobe SVG proof workflow dry-run", async () => {
   }
 });
 
+test("HTTP bridge executes an Adobe project workflow dry-run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-adobe-project-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/adobe-project/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/http-adobe-project.svg",
+        intent: "cartoon",
+        platform: "wsl",
+        photoshopPlatform: "wsl",
+        illustratorRunMode: "com",
+        dryRun: true,
+        maxReviewIterations: 3
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      reviewIterations: Array<{ attempt: number; nextGoalPrompt: string | null }>;
+      workflow: { photoshopHandoffSvgPath: string; handoff: { sequence: string[]; illustratorConsumes: string }; photoshopProjectJob: { jobPath: string }; runbook: unknown[] };
+      sceneLaunch: { command: { command: string } };
+      sourceExportLaunch: { command: { command: string } };
+      photoshopProjectLaunch: { command: { command: string } };
+      illustratorReferenceLaunch: { command: { command: string } };
+      finalExportLaunch: { command: { command: string } };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.reviewIterations.length, 1);
+    assert.equal(body.reviewIterations[0]?.attempt, 1);
+    assert.equal(body.workflow.runbook.length, 8);
+    assert.equal(body.workflow.handoff.sequence.length, 5);
+    assert.match(body.workflow.photoshopHandoffSvgPath, /http-adobe-project\.photoshop-handoff\.svg$/);
+    assert.equal(body.workflow.handoff.illustratorConsumes, body.workflow.photoshopHandoffSvgPath);
+    assert.match(body.workflow.photoshopProjectJob.jobPath, /jobs\/.+\.jsx$/);
+    assert.equal(body.sceneLaunch.command.command, "powershell.exe");
+    assert.equal(body.sourceExportLaunch.command.command, "powershell.exe");
+    assert.equal(body.photoshopProjectLaunch.command.command, "powershell.exe");
+    assert.equal(body.illustratorReferenceLaunch.command.command, "powershell.exe");
+    assert.equal(body.finalExportLaunch.command.command, "powershell.exe");
+  } finally {
+    await server.close();
+  }
+});
+
 test("HTTP bridge executes an object workflow dry-run through COM mode", async () => {
   const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-object-execute-"));
   const server = await startBridgeServer({ port: 0, root });

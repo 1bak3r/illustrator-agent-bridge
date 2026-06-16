@@ -1,4 +1,13 @@
-import type { BridgeCommand, CartoonScene, ElementStyle, ExportCommand, GeneratedJob, PathPoint, SceneElement } from "./types.js";
+import type {
+  BridgeCommand,
+  CartoonScene,
+  ElementStyle,
+  ExportCommand,
+  GeneratedJob,
+  PathPoint,
+  PlaceFileReferenceCommand,
+  SceneElement
+} from "./types.js";
 
 const DEFAULT_WIDTH = 720;
 const DEFAULT_HEIGHT = 480;
@@ -17,7 +26,15 @@ export function generateJsx(command: BridgeCommand, options: GenerateOptions): s
     return generateCartoonSceneJsx(command.scene, options);
   }
 
-  return generateExportJsx(command, options);
+  if (command.kind === "place_image_reference" || command.kind === "place_file_reference") {
+    return generatePlaceFileReferenceJsx(command, options);
+  }
+
+  if (command.kind === "export") {
+    return generateExportJsx(command, options);
+  }
+
+  throw new Error(`Unsupported Illustrator command kind: ${(command as BridgeCommand).kind}`);
 }
 
 function generatePingJsx(message: string, options: GenerateOptions): string {
@@ -89,6 +106,53 @@ function generateExportJsx(command: ExportCommand, options: GenerateOptions): st
     "}());",
     ""
   ].join("\n");
+}
+
+function generatePlaceFileReferenceJsx(command: PlaceFileReferenceCommand, options: GenerateOptions): string {
+  const layerName = command.layerName ?? "Photoshop project reference";
+  const placedName = command.name ?? "photoshop-reference-pass";
+  const x = command.x ?? 0;
+  const y = command.y ?? 0;
+  const opacity = command.opacity ?? 35;
+  const locked = command.locked ?? true;
+  const embed = command.embed ?? false;
+
+  return [
+    "#target illustrator",
+    "(function () {",
+    runtimeFunctions(options),
+    "  try {",
+    "    if (app.documents.length === 0) {",
+    "      throw new Error('No active Illustrator document to place a Photoshop reference file into.');",
+    "    }",
+    "    var doc = app.activeDocument;",
+    `    var inputFile = new File(${jsonLiteral(command.inputPath)});`,
+    "    if (!inputFile.exists) {",
+    "      throw new Error('Photoshop reference file does not exist: ' + inputFile.fsName);",
+    "    }",
+    "    var layer = doc.layers.add();",
+    `    layer.name = ${jsonLiteral(layerName)};`,
+    "    var placed = layer.placedItems.add();",
+    "    placed.file = inputFile;",
+    `    placed.name = ${jsonLiteral(placedName)};`,
+    `    placed.left = ${numberLiteral(x)};`,
+    `    placed.top = doc.height - ${numberLiteral(y)};`,
+    command.width === undefined ? "" : `    placed.width = ${numberLiteral(command.width)};`,
+    command.height === undefined ? "" : `    placed.height = ${numberLiteral(command.height)};`,
+    `    placed.opacity = ${numberLiteral(opacity)};`,
+    embed ? "    try { placed.embed(); } catch (embedError) {}" : "",
+    locked ? "    layer.locked = true;" : "",
+    "    app.redraw();",
+    `    writeResult('{"ok":true,"jobId":${jsonLiteral(options.id)},"kind":${jsonLiteral(command.kind)},"inputPath":${jsonLiteral(command.inputPath)},"layerName":${jsonLiteral(layerName)},"placedName":${jsonLiteral(placedName)},"embedded":${embed ? "true" : "false"},"locked":${locked ? "true" : "false"},"app":"Adobe Illustrator","version":' + jsonString(app.version) + '}');`,
+    "  } catch (e) {",
+    "    writeFailure(e);",
+    "    throw e;",
+    "  }",
+    "}());",
+    ""
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
 }
 
 function runtimeFunctions(options: GenerateOptions): string {

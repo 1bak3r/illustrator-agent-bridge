@@ -119,7 +119,7 @@ export async function prepareAdobeSvgProofWorkflow(options: PrepareAdobeSvgProof
   const outputPath = resolveOutputPath(options.outputPath);
   const proofPngPath = resolveOutputPath(options.proofPngPath ?? defaultProofPath(outputPath));
   const corpus = await loadDefaultCorpus(options.corpusPath);
-  const planned = await planSceneForPrompt(options.prompt, corpus, options);
+  const planned = await planAdobeArtworkScene(options.prompt, corpus, options);
   const sceneJob = await createGeneratedJob({ kind: "cartoon_scene", scene: planned.scene }, options.root);
   const exportJob = await createGeneratedJob(
     {
@@ -383,7 +383,7 @@ async function executeAdobeSvgProofWorkflowAttempt(options: ExecuteAdobeSvgProof
   };
 }
 
-async function planSceneForPrompt(
+export async function planAdobeArtworkScene(
   prompt: string,
   corpus: SemanticItem[],
   options: PrepareAdobeSvgProofWorkflowOptions
