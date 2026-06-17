@@ -281,6 +281,35 @@ test("HTTP bridge exposes Illustrator mouse dry-run automation", async () => {
     assert.equal(body.action, "dry-run");
     assert.match(body.stdout, /AgentBridgeMouse/);
     assert.match(body.stdout, /mouse_event/);
+
+    const photoshopResponse = await fetch(`${server.url}/v1/photoshop/mouse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        platform: "wsl",
+        action: "drag",
+        x: 0.35,
+        y: 0.55,
+        toX: 0.65,
+        toY: 0.58,
+        toolShortcut: "b",
+        dryRun: true
+      })
+    });
+
+    assert.equal(photoshopResponse.status, 201);
+    const photoshopBody = (await photoshopResponse.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      target: string;
+      action: string;
+      stdout: string;
+    };
+    assert.equal(photoshopBody.ok, true);
+    assert.equal(photoshopBody.dryRun, true);
+    assert.equal(photoshopBody.target, "photoshop");
+    assert.equal(photoshopBody.action, "dry-run");
+    assert.match(photoshopBody.stdout, /Photoshop/);
   } finally {
     await server.close();
   }
@@ -386,6 +415,123 @@ test("HTTP bridge executes a cartoon workflow dry-run", async () => {
     assert.equal(body.dryRun, true);
     assert.equal(body.sceneLaunch.dryRun, true);
     assert.equal(body.exportLaunch.dryRun, true);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge executes an Adobe SVG proof workflow dry-run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-adobe-proof-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/adobe-svg-proof/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/http-adobe-proof.svg",
+        intent: "cartoon",
+        platform: "wsl",
+        photoshopPlatform: "wsl",
+        illustratorRunMode: "com",
+        dryRun: true,
+        maxReviewIterations: 3,
+        visibleMouseProof: true
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      reviewIterations: Array<{ attempt: number; nextGoalPrompt: string | null }>;
+      workflow: { intent: string; photoshopProofJob: { jobPath: string }; runbook: unknown[] };
+      sceneLaunch: { command: { command: string } };
+      exportLaunch: { command: { command: string } };
+      photoshopLaunch: { command: { command: string }; next: { resultContract: string } };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.reviewIterations.length, 1);
+    assert.equal(body.reviewIterations[0]?.attempt, 1);
+    assert.equal(body.reviewIterations[0]?.nextGoalPrompt, null);
+    assert.equal(body.workflow.intent, "cartoon");
+    assert.equal(body.workflow.runbook.length, 6);
+    assert.match(body.workflow.photoshopProofJob.jobPath, /jobs\/.+\.jsx$/);
+    assert.equal(body.sceneLaunch.command.command, "powershell.exe");
+    assert.equal(body.exportLaunch.command.command, "powershell.exe");
+    assert.equal(body.photoshopLaunch.command.command, "powershell.exe");
+    assert.match(body.photoshopLaunch.next.resultContract, /Photoshop/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("HTTP bridge executes an Adobe project workflow dry-run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "illustrator-agent-bridge-adobe-project-"));
+  const server = await startBridgeServer({ port: 0, root });
+
+  try {
+    const response = await fetch(`${server.url}/v1/workflows/adobe-project/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        prompt: "cartoon lab scientist with flask",
+        outputPath: "var/exports/http-adobe-project.svg",
+        intent: "cartoon",
+        platform: "wsl",
+        photoshopPlatform: "wsl",
+        illustratorRunMode: "com",
+        dryRun: true,
+        maxReviewIterations: 3,
+        visibleMouseProof: true
+      })
+    });
+
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      ok: boolean;
+      dryRun: boolean;
+      reviewIterations: Array<{ attempt: number; nextGoalPrompt: string | null }>;
+      workflow: {
+        photoshopHandoffSvgPath: string;
+        handoff: { sequence: string[]; illustratorConsumes: string };
+        photoshopProjectJob: { jobPath: string };
+        photoshopCommitJob: { jobPath: string };
+        runbook: unknown[];
+      };
+      sceneLaunch: { command: { command: string } };
+      sourceExportLaunch: { command: { command: string } };
+      photoshopProjectLaunch: { command: { command: string } };
+      photoshopCommitLaunch: { command: { command: string } };
+      illustratorReferenceLaunch: { command: { command: string } };
+      finalExportLaunch: { command: { command: string } };
+      visibleMouseProofs: {
+        illustratorScene: { action: string };
+        photoshopEdit: { target: string };
+        illustratorReturn: { target: string };
+      };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.dryRun, true);
+    assert.equal(body.reviewIterations.length, 1);
+    assert.equal(body.reviewIterations[0]?.attempt, 1);
+    assert.equal(body.workflow.runbook.length, 12);
+    assert.equal(body.workflow.handoff.sequence.length, 7);
+    assert.match(body.workflow.photoshopHandoffSvgPath, /http-adobe-project\.photoshop-handoff\.svg$/);
+    assert.equal(body.workflow.handoff.illustratorConsumes, body.workflow.photoshopHandoffSvgPath);
+    assert.match(body.workflow.photoshopProjectJob.jobPath, /jobs\/.+\.jsx$/);
+    assert.match(body.workflow.photoshopCommitJob.jobPath, /jobs\/.+\.jsx$/);
+    assert.equal(body.sceneLaunch.command.command, "powershell.exe");
+    assert.equal(body.sourceExportLaunch.command.command, "powershell.exe");
+    assert.equal(body.photoshopProjectLaunch.command.command, "powershell.exe");
+    assert.equal(body.photoshopCommitLaunch.command.command, "powershell.exe");
+    assert.equal(body.illustratorReferenceLaunch.command.command, "powershell.exe");
+    assert.equal(body.finalExportLaunch.command.command, "powershell.exe");
+    assert.equal(body.visibleMouseProofs.illustratorScene.action, "dry-run");
+    assert.equal(body.visibleMouseProofs.photoshopEdit.target, "photoshop");
+    assert.equal(body.visibleMouseProofs.illustratorReturn.target, "illustrator");
   } finally {
     await server.close();
   }

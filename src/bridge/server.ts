@@ -6,7 +6,7 @@ import { getGeneratedJobPaths, resolveBridgeRoot } from "./files.js";
 import { detectIllustratorApps, probeIllustratorCommunication, type IllustratorProbeMethod } from "./illustratorProbe.js";
 import { generatedJobSummary } from "./jsxGenerator.js";
 import { LaunchJobError, launchJsxJob, resolveLaunchPlatform, type LaunchPlatform } from "./launcher.js";
-import { driveIllustratorMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./mouseAutomation.js";
+import { driveIllustratorMouse, drivePhotoshopMouse, type IllustratorMouseAction, type IllustratorMouseButton } from "./mouseAutomation.js";
 import { JobResultError, normalizeJobId, readJobStatus } from "./results.js";
 import { normalizeCommand, normalizeScene, ValidationError } from "./validation.js";
 import { OpenAiPlannerError } from "../planner/openAiCartoonPlanner.js";
@@ -19,6 +19,8 @@ import { guardObjectShapeScene } from "../qa/objectShapeGuard.js";
 import { loadDefaultCorpus, searchCorpus } from "../semantic/search.js";
 import type { SemanticKind } from "../semantic/types.js";
 import { inspectVectorShapeFiles } from "../semantic/vectorShapeIngest.js";
+import { executeAdobeProjectWorkflow, prepareAdobeProjectWorkflow } from "../workflow/adobeProjectWorkflow.js";
+import { executeAdobeSvgProofWorkflow, prepareAdobeSvgProofWorkflow, type AdobeArtworkIntent, type AdobeSvgProofRunMode } from "../workflow/adobeSvgProofWorkflow.js";
 import { executeCartoonWorkflow } from "../workflow/cartoonExecutor.js";
 import { executeObjectShapeWorkflow, type ObjectWorkflowRunMode } from "../workflow/objectExecutor.js";
 import { prepareCartoonWorkflow } from "../workflow/cartoonWorkflow.js";
@@ -127,6 +129,28 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       endRelativeY: optionalNumberBodyValue(body.toY, "toY"),
       durationMs: optionalNumberBodyValue(body.durationMs, "durationMs"),
       windowTitlePattern: optionalStringBodyValue(body.windowTitlePattern, "windowTitlePattern"),
+      toolShortcut: optionalStringBodyValue(body.toolShortcut, "toolShortcut"),
+      toolShortcutDelayMs: optionalNumberBodyValue(body.toolShortcutDelayMs, "toolShortcutDelayMs"),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun")
+    });
+    writeJson(response, 201, result);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/photoshop/mouse") {
+    const body = objectBody(await readOptionalJson(request));
+    const result = await drivePhotoshopMouse({
+      platform: resolveLaunchPlatform(optionalLaunchPlatform(body.platform)),
+      action: optionalMouseAction(body.action),
+      button: optionalMouseButton(body.button),
+      relativeX: optionalNumberBodyValue(body.x, "x"),
+      relativeY: optionalNumberBodyValue(body.y, "y"),
+      endRelativeX: optionalNumberBodyValue(body.toX, "toX"),
+      endRelativeY: optionalNumberBodyValue(body.toY, "toY"),
+      durationMs: optionalNumberBodyValue(body.durationMs, "durationMs"),
+      windowTitlePattern: optionalStringBodyValue(body.windowTitlePattern, "windowTitlePattern"),
+      toolShortcut: optionalStringBodyValue(body.toolShortcut, "toolShortcut"),
+      toolShortcutDelayMs: optionalNumberBodyValue(body.toolShortcutDelayMs, "toolShortcutDelayMs"),
       dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun")
     });
     writeJson(response, 201, result);
@@ -316,6 +340,145 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse, 
       root
     });
 
+    writeJson(response, 201, execution);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/adobe-svg-proof") {
+    const body = objectBody(await readJson(request));
+    const workflow = await prepareAdobeSvgProofWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      proofPngPath: optionalStringBodyValue(body.proofPngPath, "proofPngPath"),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      intent: optionalAdobeArtworkIntent(body.intent),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
+      proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
+      proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
+      proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      root
+    });
+    writeJson(response, 201, workflow);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/adobe-svg-proof/execute") {
+    const body = objectBody(await readJson(request));
+    const execution = await executeAdobeSvgProofWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      proofPngPath: optionalStringBodyValue(body.proofPngPath, "proofPngPath"),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      intent: optionalAdobeArtworkIntent(body.intent),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
+      proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
+      proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
+      proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      launchPlatform: optionalLaunchPlatform(body.platform),
+      appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      illustratorRunMode: optionalAdobeSvgProofRunMode(body.illustratorRunMode),
+      photoshopPlatform: optionalLaunchPlatform(body.photoshopPlatform),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      waitForResults: optionalBooleanBodyValue(body.waitForResults, "waitForResults"),
+      timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
+      intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
+      skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      skipArtworkReview: optionalBooleanBodyValue(body.skipArtworkReview, "skipArtworkReview"),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio"),
+      proofMinWidth: optionalNumberBodyValue(body.proofMinWidth, "proofMinWidth"),
+      proofMinHeight: optionalNumberBodyValue(body.proofMinHeight, "proofMinHeight"),
+      proofMinNonBlankRatio: optionalNumberBodyValue(body.proofMinNonBlankRatio, "proofMinNonBlankRatio"),
+      maxReviewIterations: optionalNumberBodyValue(body.maxReviewIterations, "maxReviewIterations"),
+      root
+    });
+    writeJson(response, 201, execution);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/adobe-project") {
+    const body = objectBody(await readJson(request));
+    const workflow = await prepareAdobeProjectWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      sourceSvgPath: optionalStringBodyValue(body.sourceSvgPath, "sourceSvgPath"),
+      photoshopReferencePngPath: optionalStringBodyValue(body.photoshopReferencePngPath, "photoshopReferencePngPath"),
+      photoshopHandoffSvgPath: optionalStringBodyValue(body.photoshopHandoffSvgPath, "photoshopHandoffSvgPath"),
+      photoshopWorkingPsdPath: optionalStringBodyValue(body.photoshopWorkingPsdPath, "photoshopWorkingPsdPath"),
+      photoshopFeedbackPath: optionalStringBodyValue(body.photoshopFeedbackPath, "photoshopFeedbackPath"),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      intent: optionalAdobeArtworkIntent(body.intent),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
+      proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
+      proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
+      proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      referenceOpacity: optionalNumberBodyValue(body.referenceOpacity, "referenceOpacity"),
+      embedReference: optionalBooleanBodyValue(body.embedReference, "embedReference"),
+      visibleMouseProof: optionalBooleanBodyValue(body.visibleMouseProof, "visibleMouseProof"),
+      root
+    });
+    writeJson(response, 201, workflow);
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/v1/workflows/adobe-project/execute") {
+    const body = objectBody(await readJson(request));
+    const execution = await executeAdobeProjectWorkflow({
+      prompt: stringBodyValue(body.prompt, "prompt"),
+      outputPath: stringBodyValue(body.outputPath, "outputPath"),
+      sourceSvgPath: optionalStringBodyValue(body.sourceSvgPath, "sourceSvgPath"),
+      photoshopReferencePngPath: optionalStringBodyValue(body.photoshopReferencePngPath, "photoshopReferencePngPath"),
+      photoshopHandoffSvgPath: optionalStringBodyValue(body.photoshopHandoffSvgPath, "photoshopHandoffSvgPath"),
+      photoshopWorkingPsdPath: optionalStringBodyValue(body.photoshopWorkingPsdPath, "photoshopWorkingPsdPath"),
+      photoshopFeedbackPath: optionalStringBodyValue(body.photoshopFeedbackPath, "photoshopFeedbackPath"),
+      width: optionalNumberBodyValue(body.width, "width"),
+      height: optionalNumberBodyValue(body.height, "height"),
+      title: optionalStringBodyValue(body.title, "title"),
+      intent: optionalAdobeArtworkIntent(body.intent),
+      plannerMode: optionalPlannerMode(body.planner),
+      openAiModel: optionalStringBodyValue(body.model, "model"),
+      proofWidth: optionalNumberBodyValue(body.proofWidth, "proofWidth"),
+      proofHeight: optionalNumberBodyValue(body.proofHeight, "proofHeight"),
+      proofResolution: optionalNumberBodyValue(body.proofResolution, "proofResolution"),
+      referenceOpacity: optionalNumberBodyValue(body.referenceOpacity, "referenceOpacity"),
+      embedReference: optionalBooleanBodyValue(body.embedReference, "embedReference"),
+      visibleMouseProof: optionalBooleanBodyValue(body.visibleMouseProof, "visibleMouseProof"),
+      visibleMouseDurationMs: optionalNumberBodyValue(body.visibleMouseDurationMs, "visibleMouseDurationMs"),
+      illustratorMouseToolShortcut: optionalStringBodyValue(body.illustratorMouseToolShortcut, "illustratorMouseToolShortcut"),
+      photoshopMouseToolShortcut: optionalStringBodyValue(body.photoshopMouseToolShortcut, "photoshopMouseToolShortcut"),
+      illustratorMouseWindowTitlePattern: optionalStringBodyValue(body.illustratorMouseWindowTitlePattern, "illustratorMouseWindowTitlePattern"),
+      photoshopMouseWindowTitlePattern: optionalStringBodyValue(body.photoshopMouseWindowTitlePattern, "photoshopMouseWindowTitlePattern"),
+      launchPlatform: optionalLaunchPlatform(body.platform),
+      appPath: optionalStringBodyValue(body.appPath, "appPath"),
+      illustratorRunMode: optionalAdobeSvgProofRunMode(body.illustratorRunMode),
+      photoshopPlatform: optionalLaunchPlatform(body.photoshopPlatform),
+      dryRun: optionalBooleanBodyValue(body.dryRun, "dryRun"),
+      waitForResults: optionalBooleanBodyValue(body.waitForResults, "waitForResults"),
+      timeoutMs: optionalNumberBodyValue(body.timeoutMs, "timeoutMs"),
+      intervalMs: optionalNumberBodyValue(body.intervalMs, "intervalMs"),
+      skipQa: optionalBooleanBodyValue(body.skipQa, "skipQa"),
+      skipArtworkReview: optionalBooleanBodyValue(body.skipArtworkReview, "skipArtworkReview"),
+      minBytes: optionalNumberBodyValue(body.minBytes, "minBytes"),
+      minWidth: optionalNumberBodyValue(body.minWidth, "minWidth"),
+      minHeight: optionalNumberBodyValue(body.minHeight, "minHeight"),
+      minNonBlankRatio: optionalNumberBodyValue(body.minNonBlankRatio, "minNonBlankRatio"),
+      proofMinWidth: optionalNumberBodyValue(body.proofMinWidth, "proofMinWidth"),
+      proofMinHeight: optionalNumberBodyValue(body.proofMinHeight, "proofMinHeight"),
+      proofMinNonBlankRatio: optionalNumberBodyValue(body.proofMinNonBlankRatio, "proofMinNonBlankRatio"),
+      maxReviewIterations: optionalNumberBodyValue(body.maxReviewIterations, "maxReviewIterations"),
+      root
+    });
     writeJson(response, 201, execution);
     return;
   }
@@ -595,6 +758,32 @@ function optionalObjectWorkflowRunMode(input: unknown): ObjectWorkflowRunMode | 
   const value = stringBodyValue(input, "runMode").toLowerCase();
   if (value !== "launch" && value !== "com") {
     throw new ValidationError("runMode must be launch or com");
+  }
+
+  return value;
+}
+
+function optionalAdobeArtworkIntent(input: unknown): AdobeArtworkIntent | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "intent").toLowerCase();
+  if (value !== "auto" && value !== "cartoon" && value !== "scientific" && value !== "object") {
+    throw new ValidationError("intent must be auto, cartoon, scientific, or object");
+  }
+
+  return value;
+}
+
+function optionalAdobeSvgProofRunMode(input: unknown): AdobeSvgProofRunMode | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const value = stringBodyValue(input, "illustratorRunMode").toLowerCase();
+  if (value !== "launch" && value !== "com") {
+    throw new ValidationError("illustratorRunMode must be launch or com");
   }
 
   return value;

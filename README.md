@@ -19,6 +19,8 @@ The bridge has proven no-key Illustrator control on Windows Illustrator from WSL
 - Uses local semantic search to retrieve scientific concepts, visual metaphors, object semantics, and publication constraints before planning complex concept figures.
 - Uses shape recipes for concrete objects such as cats, locks, and keys, then runs a local guard that returns a refinement prompt when recognizable parts, spatial grammar, or visual footprint checks fail.
 - Runs post-export artwork review that combines export QA, vector/pixel checks, scene composition checks, label-reliance checks, and `nextGoalPrompt` output for the next refinement pass.
+- Runs a cross-Adobe SVG proof workflow: natural-language prompt -> semantic/object/scientific plan -> editable Illustrator SVG -> Photoshop COM raster proof PNG -> export QA/artwork review for feedback before accepting the SVG.
+- Runs a collaborative Adobe project workflow: Illustrator creates the editable vector source SVG, Photoshop opens that SVG and writes a layered PSD, PNG preview, feedback JSON, and SVG handoff, Illustrator places that Photoshop SVG handoff back into the active document as a named reference layer, and Illustrator exports the final project SVG. With `--visible-mouse-proof`, the bridge also drives the real mouse in Illustrator, then Photoshop, then Illustrator again; Photoshop commits the return SVG after the visible mouse edit.
 - Can inspect reviewed SVG, AI, EPS, PDF, or saved bridge scene JSON files and convert detected vector shape combinations into searchable `shape_combination` semantic evidence.
 - Reads Illustrator's result JSON back from `var/results/`.
 - Exposes the same probe through CLI, HTTP dashboard, and MCP tools for an agent/browser workflow.
@@ -40,17 +42,22 @@ npm run illustrator:detect
 node dist/src/cli.js illustrator:probe --method com --draw-circle --wait
 node dist/src/cli.js illustrator:probe --method com --draw-complex --wait --mouse-proof --mouse-action click --timeout-ms 30000
 npm run illustrator:mouse -- --action move --x 0.5 --y 0.5 --dry-run
+npm run photoshop:mouse -- --platform wsl --action drag --x 0.34 --y 0.54 --to-x 0.66 --to-y 0.58 --tool-shortcut b --dry-run
 npm run jsx:ping
 npm run jsx:cartoon
 npm run semantic:search -- "cartoon lab flask"
 npm run semantic:search -- "electron transfer membrane" -- --kind scientific_concept
 npm run semantic:inspect-vector -- ./examples/cartoon-scene.json
 npm run plan:cartoon -- "cartoon lab scientist with flask"
+npm run plan:cartoon -- "urban transit system with skyline river solar rooftops and data overlay"
 npm run plan:scientific -- "polymer membrane electron transfer catalytic concept"
 npm run plan:object -- "full cat icon"
 npm run plan:cartoon -- "cartoon lab scientist with flask" -- --planner auto
 npm run workflow:cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.pdf
 npm run workflow:execute-cartoon -- "cartoon lab scientist with flask" --output ./var/exports/figure.svg --format svg --dry-run
+npm run workflow:execute-adobe-svg-proof -- "polymer membrane electron transfer catalytic concept" --output ./var/exports/concept.svg --intent auto --illustrator-run-mode com --platform wsl --photoshop-platform wsl --dry-run
+npm run workflow:execute-adobe-project -- "polymer membrane electron transfer catalytic concept" --output ./var/exports/concept-project.svg --intent auto --illustrator-run-mode com --platform wsl --photoshop-platform wsl --dry-run
+npm run workflow:execute-adobe-project -- "polymer membrane electron transfer catalytic concept" --output ./var/exports/concept-project-visible.svg --intent auto --illustrator-run-mode com --platform wsl --photoshop-platform wsl --visible-mouse-proof --dry-run
 npm run workflow:execute-object -- "full cat icon" --output ./var/exports/cat.png --format png --run-mode com --platform wsl --dry-run
 node dist/src/cli.js qa:artwork ./var/exports/cat.png --format png --prompt "full cat icon" --target cat
 ```
@@ -77,10 +84,11 @@ To prove a more complex vector scene and live mouse control, run a dry mouse pro
 
 ```bash
 npm run illustrator:mouse -- --action move --x 0.5 --y 0.5 --dry-run
+npm run photoshop:mouse -- --platform wsl --action drag --x 0.34 --y 0.54 --to-x 0.66 --to-y 0.58 --tool-shortcut b --dry-run
 node dist/src/cli.js illustrator:probe --method com --draw-complex --wait --mouse-proof --mouse-action click --timeout-ms 30000
 ```
 
-The mouse driver is intentionally fail-closed: it only runs on Windows/WSL, finds a running Illustrator window, restores and focuses it, measures the window bounds, then moves/clicks/drags using coordinates relative to that window.
+The mouse driver is intentionally fail-closed: it only runs on Windows/WSL, finds a running Illustrator or Photoshop window, restores and focuses it, measures the window bounds, then moves/clicks/drags using coordinates relative to that window. Pass `--tool-shortcut` when the visible pass should switch tools first; the Adobe project workflow defaults to `\` for Illustrator's line tool and `b` for Photoshop's brush tool.
 
 When the host OS has a JSX file association, or when you pass an Illustrator app name/path, the bridge can also ask the desktop to open the job:
 
@@ -139,7 +147,7 @@ npm run plan:object -- "simple house key icon"
 node dist/src/cli.js guard:object cat ./saved-plan-output.json
 ```
 
-`plan:object` supports `cat`, `lock`, and `key` targets today. It retrieves local shape recipes, learned `shape_combination` evidence, object semantics, style, and publication constraints, then builds a named Illustrator vector scene, runs structural scene QA, and runs the object guard. The guard rejects missing, invisible, or zero-size required parts, incoherent placement, target-word text labels, and object silhouettes that are too small to read. When `plan.guard.ok` is false, feed `plan.guard.nextGoalPrompt` or `plan.guard.nextPrompt` into the next planning call so the agent keeps iterating until the object is recognizable.
+`plan:object` supports strict guarded `cat`, `lock`, and `key` targets today. The Adobe SVG proof workflow also has a generic object fallback for unsupported object prompts such as microscopes, reactors, instruments, machines, and other complex apparatuses. The strict path retrieves local shape recipes, learned `shape_combination` evidence, object semantics, style, and publication constraints, then builds a named Illustrator vector scene, runs structural scene QA, and runs the object guard. The generic fallback retrieves object/scientific/style evidence, infers a broad archetype, builds named editable components and callouts, and then relies on export QA plus artwork review rather than the cat/lock/key structural guard. The guard rejects missing, invisible, or zero-size required parts, incoherent placement, target-word text labels, and object silhouettes that are too small to read. When `plan.guard.ok` is false, feed `plan.guard.nextGoalPrompt` or `plan.guard.nextPrompt` into the next planning call so the agent keeps iterating until the object is recognizable.
 
 Run a guarded object workflow end-to-end:
 
@@ -151,7 +159,70 @@ npm run workflow:execute-object -- "secure padlock icon" --output ./var/exports/
 
 `workflow:execute-object` can run a bounded guard refinement loop before Illustrator execution. Pass `--max-guard-iterations 3` so each failed guard attempt feeds `workflow.plan.guard.nextGoalPrompt` into the next object-planning pass until the guard passes or the limit is reached. If the final guard still fails, the workflow stops before Illustrator execution and returns the final `nextGoalPrompt`. With `--run-mode com` on Windows/WSL, it runs the scene and export jobs sequentially through Illustrator COM; with default `--run-mode launch`, it uses the regular desktop launch path.
 
-When an execute workflow waits for Illustrator results and export QA is enabled, it also runs the artwork review guard and includes `artworkReview` in the response. If `artworkReview.ok` is false, `next` contains `artworkReview.nextGoalPrompt` so the agent can revise the Illustrator scene instead of accepting the first export. Pass `--skip-review` only when you intentionally want raw export QA without composition/recognizability review.
+When an execute workflow waits for Illustrator results and export QA is enabled, it also runs the artwork review guard and includes `artworkReview` in the response. If the review returns an actionable `artworkReview.nextGoalPrompt`, `next` contains that prompt so the agent can revise the Illustrator scene instead of accepting the first export. Pass `--skip-review` only when you intentionally want raw export QA without composition/recognizability review.
+
+Run a prompt-to-Illustrator SVG workflow with Photoshop proofing:
+
+```bash
+npm run workflow:adobe-svg-proof -- "core shell emulsion polymerization scientific concept" \
+  --output ./var/exports/core-shell.svg \
+  --intent auto \
+  --proof-width 1400 \
+  --proof-height 900
+
+npm run workflow:execute-adobe-svg-proof -- "core shell emulsion polymerization scientific concept" \
+  --output ./var/exports/core-shell.svg \
+  --intent auto \
+  --illustrator-run-mode com \
+  --platform wsl \
+  --photoshop-platform wsl \
+  --max-review-iterations 3
+
+npm run workflow:execute-adobe-svg-proof -- "complex microscope object with objective lenses and calibration controls" \
+  --output ./var/exports/microscope.svg \
+  --intent object \
+  --illustrator-run-mode com \
+  --platform wsl \
+  --photoshop-platform wsl \
+  --max-review-iterations 3
+```
+
+`workflow:execute-adobe-svg-proof` keeps the Illustrator-exported SVG as the editable source of truth, then runs a Photoshop JSX proof job through `Photoshop.Application.DoJavaScriptFile`. Photoshop opens the SVG, writes a PNG proof, and the bridge runs PNG QA plus artwork review against that rasterization. If the review returns an actionable `artworkReview.nextGoalPrompt` and `--max-review-iterations` is greater than 1, the workflow feeds that prompt into the next Illustrator planning pass and regenerates the SVG/proof pair until no actionable review prompt remains or the iteration limit is reached. Use `--dry-run` first to inspect the Illustrator and Photoshop COM commands without opening either app.
+
+Create and run just the Photoshop proof leg for an existing SVG:
+
+```bash
+npm run photoshop:proof-svg -- ./var/exports/figure.svg --output ./var/exports/figure.photoshop-proof.png
+node dist/src/cli.js job:run-photoshop-com <job-id> --platform wsl --dry-run
+```
+
+Run a full Illustrator/Photoshop collaborative project pass:
+
+```bash
+npm run workflow:execute-adobe-project -- "core shell emulsion polymerization scientific concept" \
+  --output ./var/exports/core-shell-project.svg \
+  --intent auto \
+  --illustrator-run-mode com \
+  --platform wsl \
+  --photoshop-platform wsl \
+  --max-review-iterations 3
+
+npm run workflow:execute-adobe-project -- "core shell emulsion polymerization scientific concept" \
+  --output ./var/exports/core-shell-project-visible.svg \
+  --intent auto \
+  --illustrator-run-mode com \
+  --platform wsl \
+  --photoshop-platform wsl \
+  --visible-mouse-proof \
+  --visible-mouse-duration-ms 1200 \
+  --max-review-iterations 3
+```
+
+`workflow:execute-adobe-project` is the heavier back-and-forth path. It runs Illustrator first to build the editable vector scene and export a source `.illustrator-source.svg`, then runs Photoshop through COM to open that SVG and save a layered `.photoshop-working.psd`, a `.photoshop-reference.png` preview, a `.photoshop-handoff.svg`, and a `.photoshop-feedback.json` file. The workflow then returns to Illustrator, places the Photoshop SVG handoff as a named reference layer in the still-open vector document, exports the final SVG, and runs QA/review. If review returns `nextGoalPrompt` and `--max-review-iterations` is greater than 1, the next pass repeats the full Illustrator -> Photoshop -> Illustrator loop instead of only rechecking the same export.
+
+With `--visible-mouse-proof`, the project workflow expands to a visible Illustrator -> Photoshop -> Illustrator UI pass. It draws with the real mouse in Illustrator before the source SVG export, opens the source SVG in Photoshop and keeps the document active, drives the real mouse in Photoshop, then sends Escape and runs a Photoshop post-mouse commit job that overwrites the PSD, PNG preview, feedback JSON, and `.photoshop-handoff.svg`. Photoshop saves WSL-hosted PSD/PNG artifacts through a host temp file before copying them back, so Windows Photoshop does not fail on `\\wsl.localhost` save paths. Illustrator then consumes that post-mouse Photoshop SVG handoff as an editable rebuilt reference layer, avoiding fragile linked SVG placement dialogs, receives one more visible mouse return pass, and exports the final SVG. Use `--dry-run` first to inspect all PowerShell COM and mouse commands without opening or moving the apps.
+
+The visible project path also waits briefly before each mouse pass so newly opened Adobe windows expose a measurable target, retries transient Photoshop COM busy responses, and runs final SVG artwork review after export. If review returns `nextGoalPrompt` and `--max-review-iterations` is greater than 1, each next pass uses the original concept text for the scene title instead of nesting guard prompts into the artwork.
 
 Inspect reviewed vector assets and turn their shape combinations into searchable evidence:
 
@@ -219,8 +290,8 @@ That server exposes tools to create Illustrator JSX jobs and to proxy Illustrato
 It also exposes `semantic_search_visual_knowledge` so an agent can retrieve object semantics and publication constraints before mutating Illustrator.
 Use `inspect_vector_shape_files` on local reviewed vector files when a browser agent needs shape-combination evidence before updating a corpus.
 Use `detect_illustrator_desktop` and `probe_illustrator_communication` first to prove local no-key Illustrator communication. On Windows/WSL, pass `method: "com"`, `drawCircle: true`, and `waitForResult: true` to prove Illustrator can draw a circle and report completion.
-Pass `drawComplex: true` and `mouseProof: true` to prove multi-element vector drawing plus actual pointer control. Use `drive_illustrator_mouse` directly when an agent needs a measured move, click, double-click, or drag against the live Illustrator window.
-Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX.
+Pass `drawComplex: true` and `mouseProof: true` to prove multi-element vector drawing plus actual pointer control. Use `drive_illustrator_mouse` or `drive_photoshop_mouse` directly when an agent needs a measured move, click, double-click, or drag against the live Adobe window.
+Use `plan_cartoon_scene_job` for the current one-call fallback workflow: prompt -> semantic evidence -> scene plan -> static QA -> generated Illustrator JSX. The deterministic fallback now handles broad prompts with richer editable archetypes for lab scenes, urban/transit systems, workflows/processes, ecosystems/landscapes, and generic explainer diagrams instead of returning a sparse placeholder.
 Use `plan_scientific_concept_scene_job` when the prompt is an abstract or complex scientific concept. It retrieves scientific concepts and visual metaphors before creating the Illustrator scene job.
 Use `plan_object_shape_scene_job` when the prompt asks for a concrete cat, lock, or key. It returns `plan.guard`, including `guard.nextGoalPrompt` / `guard.nextPrompt` for the next refinement pass if the object is missing required recognizable parts.
 Use `guard_object_shape_scene` to check a proposed scene before or after a refinement step.
@@ -228,6 +299,8 @@ Use `prepare_object_shape_workflow` or `execute_object_shape_workflow` when the 
 Use `bridge_run_job_via_com` to execute any generated JSX job through Windows Illustrator COM without desktop script-warning prompts.
 Use `prepare_cartoon_publication_workflow` when the agent needs both a scene job and a follow-up export job with an ordered runbook.
 Use `execute_cartoon_publication_workflow` when the agent should prepare that workflow, launch scene/export JSX jobs, wait for results, and run export artifact QA. Pass `dryRun: true` first to verify the launch commands.
+Use `execute_adobe_svg_proof_workflow` when a browser/ChatGPT agent should take a prompt, create editable Illustrator SVG artwork, ask Photoshop to rasterize that SVG into a PNG proof, and return QA/review feedback for the next Illustrator refinement pass.
+Use `execute_adobe_project_workflow` when the agent should run a true shared project handoff where Illustrator sends source SVG to Photoshop, Photoshop creates PSD/PNG/feedback plus a return SVG handoff, and Illustrator consumes that Photoshop SVG before final SVG export. Pass `visibleMouseProof: true` when the agent should also drive the visible mouse in Illustrator, Photoshop, and Illustrator again; in that mode Photoshop writes the return SVG after the Photoshop mouse edit.
 Use `bridge_launch_job` to open a generated JSX job from an MCP client, then `bridge_wait_for_job_result` to prove Illustrator wrote the result JSON.
 Use `qa_export_artifact` after export to check file size, format signature, dimensions, SVG/PDF structure, and PNG nonblank pixel content.
 Use `review_artwork_quality` after export when an agent needs a semantic visual critique and `review.nextGoalPrompt` for the next revision pass.
