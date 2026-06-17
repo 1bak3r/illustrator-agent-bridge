@@ -83,10 +83,11 @@ export function planScientificConceptScene(
     throw new Error("Prompt is required to plan a scientific concept scene.");
   }
 
-  const features = inferFeatures(trimmedPrompt);
-  const conceptQueries = buildConceptQueries(trimmedPrompt, features);
+  const conceptPrompt = baseScientificPrompt(trimmedPrompt);
+  const features = inferFeatures(conceptPrompt);
+  const conceptQueries = buildConceptQueries(conceptPrompt, features);
   const evidence = collectEvidence(conceptQueries, corpus, options.evidenceLimit ?? 12);
-  const scene = buildScientificScene(trimmedPrompt, features, evidence, options);
+  const scene = buildScientificScene(conceptPrompt, features, evidence, options);
   const qa = qaCartoonScene(scene);
 
   return {
@@ -704,9 +705,26 @@ function evidenceSummary(evidence: SemanticSearchResult[]): string {
 }
 
 function titleFromPrompt(prompt: string): string {
-  const cleaned = prompt.replace(/[^a-z0-9 -]+/gi, " ").trim().replace(/\s+/g, " ");
+  const cleaned = baseScientificPrompt(prompt)
+    .replace(/[^a-z0-9 -]+/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
   const title = cleaned.length > 0 ? cleaned : "Scientific concept scene";
   return title.length > 88 ? `${title.slice(0, 85)}...` : title;
+}
+
+function baseScientificPrompt(prompt: string): string {
+  let current = prompt.trim();
+  for (let depth = 0; depth < 6; depth += 1) {
+    const firstLine = current.split(/\r?\n/, 1)[0]?.trim() ?? "";
+    const match = firstLine.match(/^Revise the Illustrator artwork for:\s*(.+)$/i);
+    if (!match) {
+      return firstLine || current;
+    }
+    current = match[1].trim();
+  }
+
+  return current;
 }
 
 function uniqueStrings(values: string[]): string[] {

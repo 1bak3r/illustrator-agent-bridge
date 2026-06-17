@@ -111,6 +111,9 @@ test("generates an Illustrator Photoshop reference placement JSX job", () => {
   assert.match(jsx, /placedItems\.add/);
   assert.match(jsx, /photoshop-handoff\.svg/);
   assert.match(jsx, /layer\.name = "Photoshop SVG handoff"/);
-  assert.match(jsx, /placed\.opacity = 42/);
+  assert.match(jsx, /placeReferenceFile\(doc, layer, inputFile, "working proof", 12, 18, 720, 480, 42, false\)/);
   assert.match(jsx, /"kind":"place_file_reference"/);
+  assert.match(jsx, /placeSvgReference/);
+  assert.match(jsx, /svg_rebuilt_reference/);
+  assert.match(jsx, /photoshop-visible-mouse-stroke/);
 });

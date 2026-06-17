@@ -186,8 +186,8 @@ export async function prepareAdobeProjectWorkflow(options: PrepareAdobeProjectWo
       feedbackPath: photoshopFeedbackPath,
       prompt: planned.plan.prompt,
       passName: "Photoshop project pass",
-      width: options.proofWidth,
-      height: options.proofHeight,
+      width: options.proofWidth ?? documentWidth,
+      height: options.proofHeight ?? documentHeight,
       resolution: options.proofResolution,
       keepOpen: Boolean(options.visibleMouseProof)
     },
@@ -355,6 +355,7 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
   }
 
   if (visibleMouseProofs) {
+    await waitForVisibleMouseUi(options);
     visibleMouseProofs.illustratorScene = await runIllustratorVisibleMouseProof(options, {
       relativeX: 0.24,
       relativeY: 0.46,
@@ -444,6 +445,7 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
   let photoshopCommitResult: JobStatus | undefined;
 
   if (visibleMouseProofs) {
+    await waitForVisibleMouseUi(options);
     visibleMouseProofs.photoshopEdit = await runPhotoshopVisibleMouseProof(options);
     if (!visibleMouseProofs.photoshopEdit.ok) {
       return failure(
@@ -462,6 +464,10 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
         },
         "Fix the visible Photoshop mouse edit pass before returning the SVG handoff to Illustrator."
       );
+    }
+
+    if (!dryRun) {
+      await delay(1500);
     }
 
     if (!workflow.photoshopCommitJob) {
@@ -645,6 +651,7 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
   }
 
   if (visibleMouseProofs) {
+    await waitForVisibleMouseUi(options);
     visibleMouseProofs.illustratorReturn = await runIllustratorVisibleMouseProof(options, {
       relativeX: 0.32,
       relativeY: 0.62,
@@ -747,7 +754,7 @@ async function executeAdobeProjectWorkflowAttempt(options: ExecuteAdobeProjectWo
       ? reviewArtworkQuality({
           prompt: workflow.prompt,
           scene: workflow.plan.scene,
-          exportQa: photoshopReferenceQa ?? finalExportQa,
+          exportQa: finalExportQa ?? photoshopReferenceQa,
           target: isObjectPlan(workflow.plan) ? workflow.plan.target : undefined
         })
       : undefined;
@@ -852,6 +859,16 @@ async function waitForJob(jobId: string, options: ExecuteAdobeProjectWorkflowOpt
   });
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+}
+
+async function waitForVisibleMouseUi(options: ExecuteAdobeProjectWorkflowOptions): Promise<void> {
+  if (!options.dryRun) {
+    await delay(2500);
+  }
+}
+
 async function runIllustratorVisibleMouseProof(
   options: ExecuteAdobeProjectWorkflowOptions,
   points: { relativeX: number; relativeY: number; endRelativeX: number; endRelativeY: number }
@@ -882,6 +899,8 @@ async function runPhotoshopVisibleMouseProof(options: ExecuteAdobeProjectWorkflo
     endRelativeY: 0.58,
     durationMs: options.visibleMouseDurationMs ?? 1200,
     toolShortcut: options.photoshopMouseToolShortcut ?? "b",
+    postShortcut: "{ESC}",
+    postShortcutDelayMs: 500,
     windowTitlePattern: options.photoshopMouseWindowTitlePattern,
     dryRun: options.dryRun
   });

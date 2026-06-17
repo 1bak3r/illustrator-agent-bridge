@@ -337,15 +337,30 @@ function isPaintVisible(value: string | null | undefined): boolean {
 }
 
 function makeNextPrompt(prompt: string, improvements: string[], target: string | undefined): string {
+  const basePrompt = baseArtworkPrompt(prompt);
   const clipped = improvements.slice(0, 6).map((issue) => `- ${issue}`).join("\n");
   const targetSentence = target ? `Make the ${target} recognizable from the vector shapes alone. ` : "";
   return [
-    `Revise the Illustrator artwork for: ${prompt}`,
+    `Revise the Illustrator artwork for: ${basePrompt}`,
     `${targetSentence}Keep the original intent, but improve the current drawing before accepting it.`,
     "Fix these review findings:",
     clipped,
     "Return a complete updated scene with concrete named vector elements, stronger silhouette/framing, readable scale, and no label reliance."
   ].join("\n");
+}
+
+function baseArtworkPrompt(prompt: string): string {
+  let current = prompt.trim();
+  for (let depth = 0; depth < 6; depth += 1) {
+    const firstLine = current.split(/\r?\n/, 1)[0]?.trim() ?? "";
+    const match = firstLine.match(/^Revise the Illustrator artwork for:\s*(.+)$/i);
+    if (!match) {
+      return firstLine || current || "the requested artwork";
+    }
+    current = match[1].trim();
+  }
+
+  return current || "the requested artwork";
 }
 
 function scoreCheck(check: ArtworkReviewCheck): number {

@@ -19,7 +19,7 @@ export async function runJsxViaPhotoshopCom(scriptPath: string, options: RunPhot
     return resultFor(command, true, false, 0, "", "", options.root);
   }
 
-  const execution = await runPowerShell(command);
+  const execution = await runPowerShellWithBusyRetry(command);
   return resultFor(command, false, execution.exitCode === 0, execution.exitCode, execution.stdout, execution.stderr, options.root);
 }
 
@@ -59,6 +59,30 @@ function runPowerShell(command: LaunchCommand): Promise<{ exitCode: number | nul
       });
     });
   });
+}
+
+async function runPowerShellWithBusyRetry(command: LaunchCommand): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
+  const maxAttempts = 6;
+  let last: { exitCode: number | null; stdout: string; stderr: string } | undefined;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    last = await runPowerShell(command);
+    if (last.exitCode === 0 || !isPhotoshopBusy(last.stderr) || attempt === maxAttempts) {
+      return last;
+    }
+
+    await delay(1500 * attempt);
+  }
+
+  return last ?? { exitCode: 1, stdout: "", stderr: "Photoshop COM did not return a result." };
+}
+
+function isPhotoshopBusy(stderr: string): boolean {
+  return /RPC_E_SERVERCALL_RETRYLATER|message filter indicated that the application is busy/i.test(stderr);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
 function resultFor(

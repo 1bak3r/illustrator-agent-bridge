@@ -42,7 +42,8 @@ test("prepareAdobeProjectWorkflow creates an Illustrator-Photoshop-Illustrator p
   assert.match(photoshopJsx, /photoshop-handoff\.svg/);
   assert.match(illustratorReferenceJsx, /"kind":"place_file_reference"/);
   assert.match(illustratorReferenceJsx, /photoshop-handoff\.svg/);
-  assert.match(illustratorReferenceJsx, /placed\.opacity = 45/);
+  assert.match(illustratorReferenceJsx, /placeReferenceFile\(doc, layer, inputFile, "photoshop-svg-handoff", 0, 0, 1400, 900, 45, false\)/);
+  assert.match(illustratorReferenceJsx, /svg_rebuilt_reference/);
 });
 
 test("executeAdobeProjectWorkflow dry-runs the full app round-trip through COM", async () => {
@@ -80,8 +81,12 @@ test("executeAdobeProjectWorkflow dry-runs the full app round-trip through COM",
   assert.equal(execution.visibleMouseProofs?.illustratorScene?.action, "dry-run");
   assert.equal(execution.visibleMouseProofs?.photoshopEdit?.target, "photoshop");
   assert.equal(execution.visibleMouseProofs?.photoshopEdit?.action, "dry-run");
+  assert.equal(execution.visibleMouseProofs?.photoshopEdit?.postShortcut, "{ESC}");
   assert.equal(execution.visibleMouseProofs?.illustratorReturn?.target, "illustrator");
   assert.match(execution.visibleMouseProofs?.illustratorScene?.stdout ?? "", /SetCursorPos/);
   assert.match(execution.visibleMouseProofs?.photoshopEdit?.stdout ?? "", /Photoshop/);
+  const photoshopProjectJsx = await readFile(execution.workflow.photoshopProjectJob.jobPath, "utf8");
+  assert.match(photoshopProjectJsx, /doc\.resizeImage\(UnitValue\(\d+, 'px'\), UnitValue\(\d+, 'px'\), null, ResampleMethod\.BICUBIC\)/);
+  assert.match(photoshopProjectJsx, /"keepOpen":true/);
   assert.equal(execution.photoshopFeedback, undefined);
 });

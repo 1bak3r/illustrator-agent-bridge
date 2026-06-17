@@ -144,3 +144,20 @@ test("planScientificConceptScene core-shell plan passes artwork review without r
     []
   );
 });
+
+test("planScientificConceptScene keeps nested refinement prompts out of scene title text", () => {
+  const prompt = [
+    "Revise the Illustrator artwork for: Revise the Illustrator artwork for: core shell emulsion polymerization scientific concept",
+    "Keep the original intent, but add margin and recenter the drawing.",
+    "Fix these review findings:",
+    "- The visible artwork extends beyond the artboard."
+  ].join("\n");
+  const plan = planScientificConceptScene(prompt, corpus, { width: 1400, height: 900 });
+  const title = plan.scene.elements.find((element) => element.name === "concept title");
+
+  assert.equal(title?.type, "text");
+  if (title?.type === "text") {
+    assert.equal(title.text, "core shell emulsion polymerization scientific concept");
+  }
+  assert.ok(plan.conceptQueries[0]?.startsWith("core shell emulsion"));
+});

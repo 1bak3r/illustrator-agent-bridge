@@ -77,6 +77,9 @@ test("generates a Photoshop project pass with PSD, PNG, SVG, and feedback artifa
   );
 
   assert.match(jsx, /#target photoshop/);
+  assert.match(jsx, /saveTarget/);
+  assert.match(jsx, /copyBackTarget/);
+  assert.match(jsx, /washInset/);
   assert.match(jsx, /PhotoshopSaveOptions/);
   assert.match(jsx, /PNGSaveOptions/);
   assert.match(jsx, /project-reference\.png/);
@@ -107,6 +110,8 @@ test("generates a Photoshop post-mouse project commit with SVG handoff trace", (
 
   assert.match(jsx, /#target photoshop/);
   assert.match(jsx, /app\.activeDocument/);
+  assert.match(jsx, /saveTarget/);
+  assert.match(jsx, /copyBackTarget/);
   assert.match(jsx, /PhotoshopSaveOptions/);
   assert.match(jsx, /PNGSaveOptions/);
   assert.match(jsx, /photoshop-visible-mouse-stroke/);

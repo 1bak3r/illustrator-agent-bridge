@@ -20,6 +20,8 @@ export interface DriveAdobeMouseOptions {
   windowTitlePattern?: string;
   toolShortcut?: string;
   toolShortcutDelayMs?: number;
+  postShortcut?: string;
+  postShortcutDelayMs?: number;
   dryRun?: boolean;
 }
 
@@ -49,6 +51,8 @@ export interface DriveAdobeMouseResult {
   button?: AdobeMouseButton;
   toolShortcut?: string;
   toolShortcutSent?: boolean;
+  postShortcut?: string;
+  postShortcutSent?: boolean;
   matchedProcess?: string;
   matchedWindow?: string;
   bounds?: MouseBounds;
@@ -96,6 +100,7 @@ export async function driveAdobeMouse(options: DriveAdobeMouseOptions): Promise<
   const endRelativeY = unitNumber(options.endRelativeY ?? relativeY, "endRelativeY");
   const durationMs = Math.max(0, Math.trunc(options.durationMs ?? 250));
   const toolShortcutDelayMs = Math.max(0, Math.trunc(options.toolShortcutDelayMs ?? 180));
+  const postShortcutDelayMs = Math.max(0, Math.trunc(options.postShortcutDelayMs ?? 250));
   const targetConfig = mouseTargetConfig(options.target);
   const script = mousePowerShell({
     target: options.target,
@@ -110,7 +115,9 @@ export async function driveAdobeMouse(options: DriveAdobeMouseOptions): Promise<
     durationMs,
     windowTitlePattern: options.windowTitlePattern,
     toolShortcut: options.toolShortcut,
-    toolShortcutDelayMs
+    toolShortcutDelayMs,
+    postShortcut: options.postShortcut,
+    postShortcutDelayMs
   });
 
   if (options.dryRun) {
@@ -124,6 +131,8 @@ export async function driveAdobeMouse(options: DriveAdobeMouseOptions): Promise<
       button,
       toolShortcut: options.toolShortcut,
       toolShortcutSent: false,
+      postShortcut: options.postShortcut,
+      postShortcutSent: false,
       stdout: script
     };
   }
@@ -140,6 +149,8 @@ export async function driveAdobeMouse(options: DriveAdobeMouseOptions): Promise<
     button: normalizeButton(parsed?.button) ?? button,
     toolShortcut: stringOrUndefined(parsed?.toolShortcut) ?? options.toolShortcut,
     toolShortcutSent: booleanOrUndefined(parsed?.toolShortcutSent),
+    postShortcut: stringOrUndefined(parsed?.postShortcut) ?? options.postShortcut,
+    postShortcutSent: booleanOrUndefined(parsed?.postShortcutSent),
     matchedProcess: stringOrUndefined(parsed?.matchedProcess),
     matchedWindow: stringOrUndefined(parsed?.matchedWindow),
     bounds: mouseBoundsOrUndefined(parsed?.bounds),
@@ -289,6 +300,8 @@ function mousePowerShell(options: {
   windowTitlePattern?: string;
   toolShortcut?: string;
   toolShortcutDelayMs: number;
+  postShortcut?: string;
+  postShortcutDelayMs: number;
 }): string {
   return `
 $ErrorActionPreference = "Stop"
@@ -305,6 +318,8 @@ $durationMs = ${options.durationMs}
 $windowTitlePattern = ${powerShellString(options.windowTitlePattern ?? "")}
 $toolShortcut = ${powerShellString(options.toolShortcut ?? "")}
 $toolShortcutDelayMs = ${options.toolShortcutDelayMs}
+$postShortcut = ${powerShellString(options.postShortcut ?? "")}
+$postShortcutDelayMs = ${options.postShortcutDelayMs}
 $result = [ordered]@{
   ok = $false
   attempted = $true
@@ -313,6 +328,8 @@ $result = [ordered]@{
   button = $button
   toolShortcut = if ($toolShortcut.Length -eq 0) { $null } else { $toolShortcut }
   toolShortcutSent = $false
+  postShortcut = if ($postShortcut.Length -eq 0) { $null } else { $postShortcut }
+  postShortcutSent = $false
   matchedProcess = $null
   matchedWindow = $null
   bounds = $null
@@ -525,6 +542,13 @@ public static class AgentBridgeMouse {
   $after = New-Object AgentBridgeMouse+POINT
   [void][AgentBridgeMouse]::GetCursorPos([ref]$after)
   $result.finalCursor = [ordered]@{ x = $after.X; y = $after.Y }
+
+  if ($postShortcut.Length -gt 0) {
+    Start-Sleep -Milliseconds $postShortcutDelayMs
+    $shell.SendKeys($postShortcut)
+    $result.postShortcutSent = $true
+  }
+
   $result.ok = $true
 } catch {
   $result.error = $_.Exception.Message
